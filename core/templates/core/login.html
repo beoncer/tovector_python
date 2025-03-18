@@ -1,0 +1,36 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Login - ToVector.ai{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-box">
+        <h1>Welcome Back</h1>
+        <p class="subtitle">Choose your preferred login method</p>
+        
+        <div class="social-login">
+            <a href="{% url 'core:login' %}?connection=google-oauth2" class="social-button google">
+                <img src="{% static 'core/images/google-icon.svg' %}" alt="Google">
+                Continue with Google
+            </a>
+            <a href="{% url 'core:login' %}?connection=facebook" class="social-button facebook">
+                <img src="{% static 'core/images/facebook-icon.svg' %}" alt="Facebook">
+                Continue with Facebook
+            </a>
+        </div>
+        
+        <div class="divider">
+            <span>or</span>
+        </div>
+        
+        <a href="{% url 'core:login' %}" class="email-button">
+            Continue with Email
+        </a>
+        
+        <p class="signup-prompt">
+            Don't have an account? <a href="{% url 'core:signup' %}">Sign up</a>
+        </p>
+    </div>
+</div>
+{% endblock %} 

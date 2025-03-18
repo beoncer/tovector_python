@@ -1,0 +1,46 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - ToVector.ai{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h1>Welcome, {{ request.user.first_name|default:request.user.email }}</h1>
+        <div class="credits-display">
+            <span class="credits-label">Available Credits:</span>
+            <span class="credits-amount">{{ request.user.credits }}</span>
+        </div>
+    </div>
+
+    <div class="dashboard-content">
+        <div class="dashboard-section">
+            <h2>Recent Vectorizations</h2>
+            <div class="empty-state">
+                <p>You haven't vectorized any images yet.</p>
+                <a href="{% url 'core:home' %}" class="primary-button">Start Vectorizing</a>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <h2>Account Information</h2>
+            <div class="account-info">
+                <div class="info-row">
+                    <span class="label">Email:</span>
+                    <span class="value">{{ request.user.email }}</span>
+                </div>
+                {% if request.user.company_name %}
+                <div class="info-row">
+                    <span class="label">Company:</span>
+                    <span class="value">{{ request.user.company_name }}</span>
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <span class="label">Member Since:</span>
+                    <span class="value">{{ request.user.date_joined|date:"F j, Y" }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -12,10 +12,14 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 import os
 from pathlib import Path
-from decouple import config, Csv
+from decouple import Config, RepositoryEnv, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file
+env_path = os.path.join(BASE_DIR, '.env')
+config = Config(RepositoryEnv(env_path))
 
 
 # Quick-start development settings - unsuitable for production
@@ -146,10 +150,31 @@ CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.app', 'https://*.ngrok.io']
 AUTH_USER_MODEL = 'core.User'
 
 # Auth0 settings
-AUTH0_DOMAIN = config('AUTH0_DOMAIN')
-AUTH0_CLIENT_ID = config('AUTH0_CLIENT_ID')
-AUTH0_CLIENT_SECRET = config('AUTH0_CLIENT_SECRET')
-AUTH0_CALLBACK_URL = config('AUTH0_CALLBACK_URL')
+AUTH0_DOMAIN = 'dev-t7eyzdzzu7e3fg04.us.auth0.com'
+AUTH0_CLIENT_ID = 'QFaKW7ojgwR2alJ6QWSoTfJyvfZ6SaxY'
+AUTH0_CLIENT_SECRET = 'Jl01Kw4CuM8e0H1F4_wF2r7fmrAq5KdeCPLpqR1tqDSuXPMb40Tsgc3gPvogitQ1'
+AUTH0_CALLBACK_URL = 'https://119a-2001-7d0-84b8-f780-d19e-b7b6-5a97-4e62.ngrok-free.app/callback/'
+
+# Debug print statements for Auth0 settings
+print("\nAuth0 Settings:")
+print(f"Domain: {AUTH0_DOMAIN}")
+print(f"Client ID: {AUTH0_CLIENT_ID}")
+print(f"Callback URL: {AUTH0_CALLBACK_URL}\n")
+
+# Initial free credits for new users
+INITIAL_FREE_CREDITS = config('INITIAL_FREE_CREDITS', default=10, cast=int)
+
+# Auth0 Social Connections
+AUTH0_SOCIAL_CONNECTIONS = {
+    'google-oauth2': {
+        'name': 'Google',
+        'icon': 'google',
+    },
+    'facebook': {
+        'name': 'Facebook',
+        'icon': 'facebook',
+    }
+}
 
 # Stripe settings
 STRIPE_PUBLIC_KEY = config('STRIPE_PUBLIC_KEY')

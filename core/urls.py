@@ -13,5 +13,6 @@ urlpatterns = [
     path('login/', views.Auth0LoginView.as_view(), name='login'),
     path('signup/', views.Auth0SignupView.as_view(), name='signup'),
     path('callback/', views.Auth0CallbackView.as_view(), name='auth0_callback'),
+    path('logout/', views.Auth0LogoutView.as_view(), name='logout'),
     path('upload/', views.UploadImageView.as_view(), name='upload'),
 ] 

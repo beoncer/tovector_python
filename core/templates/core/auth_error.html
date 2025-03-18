@@ -1,0 +1,20 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Authentication Error - ToVector.ai{% endblock %}
+
+{% block content %}
+<div class="auth-error-container">
+    <div class="auth-error-box">
+        <h1>Authentication Error</h1>
+        <div class="error-details">
+            <h2>{{ error }}</h2>
+            <p>{{ error_description }}</p>
+        </div>
+        <div class="error-actions">
+            <a href="{% url 'core:login' %}" class="retry-button">Try Again</a>
+            <a href="{% url 'core:home' %}" class="home-button">Go Home</a>
+        </div>
+    </div>
+</div>
+{% endblock %} 
