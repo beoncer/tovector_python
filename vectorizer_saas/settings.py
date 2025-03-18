@@ -150,16 +150,16 @@ CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.app', 'https://*.ngrok.io']
 AUTH_USER_MODEL = 'core.User'
 
 # Auth0 settings
-AUTH0_DOMAIN = 'dev-t7eyzdzzu7e3fg04.us.auth0.com'
-AUTH0_CLIENT_ID = 'QFaKW7ojgwR2alJ6QWSoTfJyvfZ6SaxY'
-AUTH0_CLIENT_SECRET = 'Jl01Kw4CuM8e0H1F4_wF2r7fmrAq5KdeCPLpqR1tqDSuXPMb40Tsgc3gPvogitQ1'
-AUTH0_CALLBACK_URL = 'https://119a-2001-7d0-84b8-f780-d19e-b7b6-5a97-4e62.ngrok-free.app/callback/'
+AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN')
+AUTH0_CLIENT_ID = os.getenv('AUTH0_CLIENT_ID')
+AUTH0_CLIENT_SECRET = os.getenv('AUTH0_CLIENT_SECRET')
+AUTH0_CALLBACK_URL = os.getenv('AUTH0_CALLBACK_URL')
 
-# Debug print statements for Auth0 settings
+# Print Auth0 settings for debugging
 print("\nAuth0 Settings:")
 print(f"Domain: {AUTH0_DOMAIN}")
 print(f"Client ID: {AUTH0_CLIENT_ID}")
-print(f"Callback URL: {AUTH0_CALLBACK_URL}\n")
+print(f"Callback URL: {AUTH0_CALLBACK_URL}")
 
 # Initial free credits for new users
 INITIAL_FREE_CREDITS = config('INITIAL_FREE_CREDITS', default=10, cast=int)
