@@ -1,0 +1,38 @@
+{% extends 'core/base.html' %}
+
+{% block title %}How It Works - Convector{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>How It Works</h1>
+        <p class="lead">Learn how Convector transforms your images into vector graphics</p>
+    </div>
+
+    <div class="steps-section">
+        <div class="step">
+            <div class="step-number">1</div>
+            <h3>Upload Your Image</h3>
+            <p>Start by uploading your image in PNG, JPG, BMP, or TIFF format. Our system accepts files up to 25MB.</p>
+        </div>
+
+        <div class="step">
+            <div class="step-number">2</div>
+            <h3>Preview the Result</h3>
+            <p>Our AI processes your image and shows you a preview of the vectorized result. You can make adjustments if needed.</p>
+        </div>
+
+        <div class="step">
+            <div class="step-number">3</div>
+            <h3>Download Vector Graphics</h3>
+            <p>Once you're satisfied with the preview, use your credits to download the final vector graphics in SVG, PDF, or EPS format.</p>
+        </div>
+    </div>
+
+    <div class="cta-section">
+        <h2>Ready to Get Started?</h2>
+        <p>Transform your images into high-quality vector graphics today.</p>
+        <a href="{% url 'core:home' %}" class="cta-button">Try It Now</a>
+    </div>
+</div>
+{% endblock %} 

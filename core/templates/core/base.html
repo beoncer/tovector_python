@@ -1,0 +1,170 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ToVector.ai{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.lordicon.com/lordicon.css">
+    <link rel="stylesheet" href="{% static 'core/css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">
+                <a href="{% url 'core:home' %}">tovector.ai</a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="{% url 'core:home' %}">Home</a></li>
+                <li><a href="{% url 'core:pricing' %}">Pricing</a></li>
+                <li><a href="{% url 'core:how-it-works' %}">How it Works</a></li>
+                <li><a href="{% url 'core:faq' %}">FAQ</a></li>
+            </ul>
+            <div class="auth-buttons">
+                <a href="{% url 'core:login' %}" class="login-button">Log in</a>
+                <a href="{% url 'core:signup' %}" class="signup-button">Sign up</a>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+
+        {% block why_section %}
+        <section class="why-section">
+            <div class="why-container">
+                <h2>Why ToVector.ai?</h2>
+                <div class="why-grid">
+                    <div class="why-card">
+                        <lord-icon
+                            src="https://cdn.lordicon.com/gqdnbnwt.json"
+                            trigger="hover"
+                            colors="primary:#FF0000"
+                            style="width:64px;height:64px">
+                        </lord-icon>
+                        <h3>High Quality Results</h3>
+                        <p>Get precise vector graphics with our advanced AI technology</p>
+                    </div>
+                    <div class="why-card">
+                        <lord-icon
+                            src="https://cdn.lordicon.com/mrdiiocb.json"
+                            trigger="hover"
+                            colors="primary:#FF0000"
+                            style="width:64px;height:64px">
+                        </lord-icon>
+                        <h3>Fast Processing</h3>
+                        <p>Convert your images to vectors in seconds, not hours</p>
+                    </div>
+                    <div class="why-card">
+                        <lord-icon
+                            src="https://cdn.lordicon.com/nocovwne.json"
+                            trigger="hover"
+                            colors="primary:#FF0000"
+                            style="width:64px;height:64px">
+                        </lord-icon>
+                        <h3>Multiple Formats</h3>
+                        <p>Export to SVG, PDF, or EPS - use them anywhere</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        {% endblock %}
+
+        {% block reviews_section %}
+        <section class="reviews-section">
+            <div class="reviews-container">
+                <h2>What Our Users Say</h2>
+                <div class="reviews-grid">
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"ToVector.ai has revolutionized our design workflow. The quality of vectors is outstanding!"</p>
+                        <div class="review-author">
+                            <div class="author-avatar"></div>
+                            <div class="author-info">
+                                <h4>Sarah Johnson</h4>
+                                <p>Design Lead at CreativeStudio</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"Incredibly fast and accurate. This tool has saved me countless hours of manual work."</p>
+                        <div class="review-author">
+                            <div class="author-avatar"></div>
+                            <div class="author-info">
+                                <h4>Michael Chen</h4>
+                                <p>Freelance Illustrator</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"The best vectorization service I've used. Clean results and excellent support."</p>
+                        <div class="review-author">
+                            <div class="author-avatar"></div>
+                            <div class="author-info">
+                                <h4>Emma Davis</h4>
+                                <p>Art Director</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        {% endblock %}
+    </main>
+
+    <footer>
+        <div class="footer-container">
+            <div class="footer-col">
+                <h3>Product</h3>
+                <ul>
+                    <li><a href="{% url 'core:how-it-works' %}">How it Works</a></li>
+                    <li><a href="{% url 'core:pricing' %}">Pricing</a></li>
+                    <li><a href="{% url 'core:faq' %}">FAQ</a></li>
+                    <li><a href="#">API</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h3>Company</h3>
+                <ul>
+                    <li><a href="#">About Us</a></li>
+                    <li><a href="#">Blog</a></li>
+                    <li><a href="#">Careers</a></li>
+                    <li><a href="{% url 'core:support' %}">Contact</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h3>Legal</h3>
+                <ul>
+                    <li><a href="#">Privacy Policy</a></li>
+                    <li><a href="#">Terms of Service</a></li>
+                    <li><a href="#">Cookie Policy</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h3>Connect</h3>
+                <ul>
+                    <li><a href="#">Twitter</a></li>
+                    <li><a href="#">LinkedIn</a></li>
+                    <li><a href="#">GitHub</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; {% now "Y" %} ToVector.ai. All rights reserved.</p>
+            <div class="social-links">
+                <a href="#"><i class="fab fa-twitter"></i></a>
+                <a href="#"><i class="fab fa-linkedin"></i></a>
+                <a href="#"><i class="fab fa-github"></i></a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.lordicon.com/lordicon.js"></script>
+    <script src="https://kit.fontawesome.com/your-kit-code.js" crossorigin="anonymous"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

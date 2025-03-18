@@ -1,0 +1,150 @@
+{% extends 'core/base.html' %}
+
+{% block title %}ToVector.ai - Convert Images to Vector Graphics{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+    <h1>Convert Images to Vector Graphics</h1>
+    <p class="hero-text">Transform your images into high-quality vector graphics with AI</p>
+    
+    <div class="upload-container" id="upload-container">
+        <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.bmp,.tiff" style="display: none;">
+        <div class="upload-content">
+            <p class="upload-text">Drag and drop an image here, or click to select</p>
+            <p class="supported-formats">Supported formats: PNG, JPG, BMP, TIFF (max 25MB)</p>
+        </div>
+    </div>
+
+    <div class="features-grid">
+        <div class="feature">
+            <h3>High Quality</h3>
+            <p>Get crisp, clean vectors with our advanced AI algorithms</p>
+        </div>
+        <div class="feature">
+            <h3>Multiple Formats</h3>
+            <p>Export as SVG, PDF, or EPS - use them anywhere</p>
+        </div>
+        <div class="feature">
+            <h3>Preview First</h3>
+            <p>See the result before using your credits</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadContainer = document.getElementById('upload-container');
+    const fileInput = document.getElementById('file-input');
+
+    uploadContainer.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadContainer.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadContainer.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadContainer.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+        uploadContainer.classList.add('highlight');
+    }
+
+    function unhighlight(e) {
+        uploadContainer.classList.remove('highlight');
+    }
+
+    uploadContainer.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+    }
+
+    fileInput.addEventListener('change', function(e) {
+        handleFiles(this.files);
+    });
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+            const file = files[0];
+            if (validateFile(file)) {
+                uploadFile(file);
+            }
+        }
+    }
+
+    function validateFile(file) {
+        const validTypes = ['image/png', 'image/jpeg', 'image/bmp', 'image/tiff'];
+        const maxSize = 25 * 1024 * 1024; // 25MB
+
+        if (!validTypes.includes(file.type)) {
+            alert('Please upload a valid image file (PNG, JPG, BMP, or TIFF)');
+            return false;
+        }
+
+        if (file.size > maxSize) {
+            alert('File size must be less than 25MB');
+            return false;
+        }
+
+        return true;
+    }
+
+    function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        fetch('{% url "core:upload" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                // Handle successful upload
+                console.log('Upload successful:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while uploading the file');
+        });
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+{% endblock %} 
