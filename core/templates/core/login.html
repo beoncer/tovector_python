@@ -6,31 +6,28 @@
 {% block content %}
 <div class="login-container">
     <div class="login-box">
-        <h1>Welcome Back</h1>
-        <p class="subtitle">Choose your preferred login method</p>
+        <h1>Sign in to your account</h1>
+        <p class="subtitle">Or <a href="{% url 'core:signup' %}">create a new account</a></p>
         
         <div class="social-login">
             <a href="{% url 'core:login' %}?connection=google-oauth2" class="social-button google">
                 <img src="{% static 'core/images/google-icon.svg' %}" alt="Google">
                 Continue with Google
             </a>
+            
             <a href="{% url 'core:login' %}?connection=facebook" class="social-button facebook">
                 <img src="{% static 'core/images/facebook-icon.svg' %}" alt="Facebook">
                 Continue with Facebook
             </a>
         </div>
-        
+
         <div class="divider">
-            <span>or</span>
+            <span>Or continue with</span>
         </div>
-        
-        <a href="{% url 'core:login' %}" class="email-button">
+
+        <a href="{% url 'core:login' %}?connection=Username-Password-Authentication" class="email-button">
             Continue with Email
         </a>
-        
-        <p class="signup-prompt">
-            Don't have an account? <a href="{% url 'core:signup' %}">Sign up</a>
-        </p>
     </div>
 </div>
 {% endblock %} 

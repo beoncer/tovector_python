@@ -150,10 +150,10 @@ CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.app', 'https://*.ngrok.io']
 AUTH_USER_MODEL = 'core.User'
 
 # Auth0 settings
-AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN')
-AUTH0_CLIENT_ID = os.getenv('AUTH0_CLIENT_ID')
-AUTH0_CLIENT_SECRET = os.getenv('AUTH0_CLIENT_SECRET')
-AUTH0_CALLBACK_URL = os.getenv('AUTH0_CALLBACK_URL')
+AUTH0_DOMAIN = config('AUTH0_DOMAIN')
+AUTH0_CLIENT_ID = config('AUTH0_CLIENT_ID')
+AUTH0_CLIENT_SECRET = config('AUTH0_CLIENT_SECRET')
+AUTH0_CALLBACK_URL = config('AUTH0_CALLBACK_URL')
 
 # Print Auth0 settings for debugging
 print("\nAuth0 Settings:")
@@ -173,6 +173,10 @@ AUTH0_SOCIAL_CONNECTIONS = {
     'facebook': {
         'name': 'Facebook',
         'icon': 'facebook',
+    },
+    'email': {
+        'name': 'Email',
+        'icon': 'email',
     }
 }
 

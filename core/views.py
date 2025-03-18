@@ -55,12 +55,14 @@ class Auth0LoginView(View):
         auth0_domain = settings.AUTH0_DOMAIN
         client_id = settings.AUTH0_CLIENT_ID
         callback_url = settings.AUTH0_CALLBACK_URL
+        connection = request.GET.get('connection')
         
         # Debug print statements
-        print("Auth0 Settings:")
+        print("\nAuth0 Login Settings:")
         print(f"Domain: {auth0_domain}")
         print(f"Client ID: {client_id}")
         print(f"Callback URL: {callback_url}")
+        print(f"Connection: {connection}")
         
         # Build the authorization URL
         params = {
@@ -68,11 +70,15 @@ class Auth0LoginView(View):
             'client_id': client_id,
             'redirect_uri': callback_url,
             'scope': 'openid profile email',
-            'connection': request.GET.get('connection'),
         }
         
-        # Remove None values from params
-        params = {k: v for k, v in params.items() if v is not None}
+        # For social logins, specify the connection
+        if connection in ['google-oauth2', 'facebook']:
+            params['connection'] = connection
+        # For email login, use the database connection
+        elif connection == 'Username-Password-Authentication':
+            params['connection'] = 'Username-Password-Authentication'
+            params['prompt'] = 'login'
         
         # Use urlencode to properly encode the parameters
         auth_url = f'https://{auth0_domain}/authorize?{urlencode(params)}'
@@ -88,6 +94,14 @@ class Auth0SignupView(View):
         auth0_domain = settings.AUTH0_DOMAIN
         client_id = settings.AUTH0_CLIENT_ID
         callback_url = settings.AUTH0_CALLBACK_URL
+        connection = request.GET.get('connection')
+        
+        # Debug print statements
+        print("\nAuth0 Signup Settings:")
+        print(f"Domain: {auth0_domain}")
+        print(f"Client ID: {client_id}")
+        print(f"Callback URL: {callback_url}")
+        print(f"Connection: {connection}")
         
         # Build the authorization URL with signup hint
         params = {
@@ -95,12 +109,21 @@ class Auth0SignupView(View):
             'client_id': client_id,
             'redirect_uri': callback_url,
             'scope': 'openid profile email',
-            'screen_hint': 'signup'
+            'screen_hint': 'signup',
+            'prompt': 'login'
         }
+        
+        # For social logins, specify the connection
+        if connection in ['google-oauth2', 'facebook']:
+            params['connection'] = connection
+        # For email signup, use the database connection
+        elif connection == 'Username-Password-Authentication':
+            params['connection'] = 'Username-Password-Authentication'
         
         # Use urlencode to properly encode the parameters
         auth_url = f'https://{auth0_domain}/authorize?{urlencode(params)}'
         
+        print(f"Final Signup URL: {auth_url}")
         return redirect(auth_url)
 
 class Auth0LogoutView(View):
@@ -125,13 +148,15 @@ class Auth0CallbackView(View):
         
         if error:
             # Handle authentication error
+            print(f"\nAuth0 Error: {error}")
+            print(f"Error Description: {error_description}")
             return render(request, 'core/auth_error.html', {
                 'error': error,
                 'error_description': error_description
             })
             
         if not code:
-            return redirect('home')
+            return redirect('core:home')
             
         try:
             # Exchange the authorization code for tokens
@@ -144,7 +169,22 @@ class Auth0CallbackView(View):
                 'grant_type': 'authorization_code'
             }
             
-            token_response = requests.post(token_url, json=token_payload)
+            # Debug print token request
+            print("\nToken Request:")
+            print(f"URL: {token_url}")
+            print(f"Client ID: {settings.AUTH0_CLIENT_ID}")
+            print(f"Client Secret: {'*' * 8}{settings.AUTH0_CLIENT_SECRET[-4:] if settings.AUTH0_CLIENT_SECRET else 'Not Set'}")
+            print(f"Code: {code}")
+            print(f"Redirect URI: {settings.AUTH0_CALLBACK_URL}")
+            
+            # Make sure we're using form data instead of JSON
+            token_response = requests.post(token_url, data=token_payload)
+            
+            # Debug print token response
+            print("\nToken Response:")
+            print(f"Status Code: {token_response.status_code}")
+            print(f"Response: {token_response.text}")
+            
             token_response.raise_for_status()  # Raise exception for bad status codes
             tokens = token_response.json()
             
@@ -183,12 +223,16 @@ class Auth0CallbackView(View):
             
         except requests.exceptions.RequestException as e:
             # Handle request errors
+            print(f"\nRequest Error: {str(e)}")
+            if hasattr(e.response, 'text'):
+                print(f"Response: {e.response.text}")
             return render(request, 'core/auth_error.html', {
                 'error': 'Authentication Error',
                 'error_description': str(e)
             })
         except Exception as e:
             # Handle other errors
+            print(f"\nUnexpected Error: {str(e)}")
             return render(request, 'core/auth_error.html', {
                 'error': 'System Error',
                 'error_description': 'An unexpected error occurred. Please try again.'
