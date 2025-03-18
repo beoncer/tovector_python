@@ -1,9 +1,32 @@
+# Django and Core Dependencies
 Django==5.0.2
-python-decouple==3.8
-python-jose==3.3.0
-requests==2.31.0
-stripe==7.11.0
-python-dotenv==1.0.1
-Pillow==9.5.0
+djangorestframework==3.14.0
+django-environ==0.11.2
 django-cors-headers==4.3.1
-django-environ==0.11.2 
+django-storages==1.14.2
+
+# Authentication
+python-jose==3.3.0
+python-dotenv==1.0.1
+requests==2.31.0
+
+# Database
+psycopg2-binary==2.9.9
+dj-database-url==2.1.0
+
+# Payment Processing
+stripe==7.11.0
+
+# Image Processing
+Pillow==10.2.0
+
+# Development Tools
+black==24.2.0
+flake8==7.0.0
+pytest==8.0.2
+pytest-django==4.8.0
+coverage==7.4.3
+
+# Production
+gunicorn==21.2.0
+whitenoise==6.6.0 
