@@ -15,4 +15,8 @@ urlpatterns = [
     path('callback/', views.Auth0CallbackView.as_view(), name='auth0_callback'),
     path('logout/', views.Auth0LogoutView.as_view(), name='logout'),
     path('upload/', views.UploadImageView.as_view(), name='upload'),
+    path('webhook/stripe/', views.stripe_webhook, name='stripe_webhook'),
+    path('create-checkout-session/', views.create_checkout_session, name='create_checkout_session'),
+    path('checkout/success/', views.checkout_success, name='checkout_success'),
+    path('checkout/cancel/', views.checkout_cancel, name='checkout_cancel'),
 ] 

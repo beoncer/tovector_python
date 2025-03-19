@@ -10,7 +10,13 @@ from django.core.exceptions import SuspiciousOperation
 from urllib.parse import urlencode
 import requests
 import json
-from .models import CreditPack, User
+from .models import CreditPack, User, Transaction
+import stripe
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from django.urls import reverse
+from decimal import Decimal
 
 def home(request):
     """Homepage view."""
@@ -25,10 +31,14 @@ def dashboard(request):
     return render(request, 'core/dashboard.html')
 
 def pricing(request):
-    """Pricing page view."""
+    """
+    View function for the pricing page.
+    Displays available credit packs for purchase.
+    """
     credit_packs = CreditPack.objects.filter(is_active=True)
     return render(request, 'core/pricing.html', {
-        'credit_packs': credit_packs
+        'credit_packs': credit_packs,
+        'stripe_public_key': settings.STRIPE_PUBLIC_KEY
     })
 
 def faq(request):
@@ -55,14 +65,12 @@ class Auth0LoginView(View):
         auth0_domain = settings.AUTH0_DOMAIN
         client_id = settings.AUTH0_CLIENT_ID
         callback_url = settings.AUTH0_CALLBACK_URL
-        connection = request.GET.get('connection')
         
         # Debug print statements
-        print("\nAuth0 Login Settings:")
+        print("Auth0 Settings:")
         print(f"Domain: {auth0_domain}")
         print(f"Client ID: {client_id}")
         print(f"Callback URL: {callback_url}")
-        print(f"Connection: {connection}")
         
         # Build the authorization URL
         params = {
@@ -70,15 +78,11 @@ class Auth0LoginView(View):
             'client_id': client_id,
             'redirect_uri': callback_url,
             'scope': 'openid profile email',
+            'connection': request.GET.get('connection'),
         }
         
-        # For social logins, specify the connection
-        if connection in ['google-oauth2', 'facebook']:
-            params['connection'] = connection
-        # For email login, use the database connection
-        elif connection == 'Username-Password-Authentication':
-            params['connection'] = 'Username-Password-Authentication'
-            params['prompt'] = 'login'
+        # Remove None values from params
+        params = {k: v for k, v in params.items() if v is not None}
         
         # Use urlencode to properly encode the parameters
         auth_url = f'https://{auth0_domain}/authorize?{urlencode(params)}'
@@ -94,14 +98,6 @@ class Auth0SignupView(View):
         auth0_domain = settings.AUTH0_DOMAIN
         client_id = settings.AUTH0_CLIENT_ID
         callback_url = settings.AUTH0_CALLBACK_URL
-        connection = request.GET.get('connection')
-        
-        # Debug print statements
-        print("\nAuth0 Signup Settings:")
-        print(f"Domain: {auth0_domain}")
-        print(f"Client ID: {client_id}")
-        print(f"Callback URL: {callback_url}")
-        print(f"Connection: {connection}")
         
         # Build the authorization URL with signup hint
         params = {
@@ -109,21 +105,12 @@ class Auth0SignupView(View):
             'client_id': client_id,
             'redirect_uri': callback_url,
             'scope': 'openid profile email',
-            'screen_hint': 'signup',
-            'prompt': 'login'
+            'screen_hint': 'signup'
         }
-        
-        # For social logins, specify the connection
-        if connection in ['google-oauth2', 'facebook']:
-            params['connection'] = connection
-        # For email signup, use the database connection
-        elif connection == 'Username-Password-Authentication':
-            params['connection'] = 'Username-Password-Authentication'
         
         # Use urlencode to properly encode the parameters
         auth_url = f'https://{auth0_domain}/authorize?{urlencode(params)}'
         
-        print(f"Final Signup URL: {auth_url}")
         return redirect(auth_url)
 
 class Auth0LogoutView(View):
@@ -148,15 +135,13 @@ class Auth0CallbackView(View):
         
         if error:
             # Handle authentication error
-            print(f"\nAuth0 Error: {error}")
-            print(f"Error Description: {error_description}")
             return render(request, 'core/auth_error.html', {
                 'error': error,
                 'error_description': error_description
             })
             
         if not code:
-            return redirect('core:home')
+            return redirect('home')
             
         try:
             # Exchange the authorization code for tokens
@@ -169,22 +154,7 @@ class Auth0CallbackView(View):
                 'grant_type': 'authorization_code'
             }
             
-            # Debug print token request
-            print("\nToken Request:")
-            print(f"URL: {token_url}")
-            print(f"Client ID: {settings.AUTH0_CLIENT_ID}")
-            print(f"Client Secret: {'*' * 8}{settings.AUTH0_CLIENT_SECRET[-4:] if settings.AUTH0_CLIENT_SECRET else 'Not Set'}")
-            print(f"Code: {code}")
-            print(f"Redirect URI: {settings.AUTH0_CALLBACK_URL}")
-            
-            # Make sure we're using form data instead of JSON
-            token_response = requests.post(token_url, data=token_payload)
-            
-            # Debug print token response
-            print("\nToken Response:")
-            print(f"Status Code: {token_response.status_code}")
-            print(f"Response: {token_response.text}")
-            
+            token_response = requests.post(token_url, json=token_payload)
             token_response.raise_for_status()  # Raise exception for bad status codes
             tokens = token_response.json()
             
@@ -223,16 +193,12 @@ class Auth0CallbackView(View):
             
         except requests.exceptions.RequestException as e:
             # Handle request errors
-            print(f"\nRequest Error: {str(e)}")
-            if hasattr(e.response, 'text'):
-                print(f"Response: {e.response.text}")
             return render(request, 'core/auth_error.html', {
                 'error': 'Authentication Error',
                 'error_description': str(e)
             })
         except Exception as e:
             # Handle other errors
-            print(f"\nUnexpected Error: {str(e)}")
             return render(request, 'core/auth_error.html', {
                 'error': 'System Error',
                 'error_description': 'An unexpected error occurred. Please try again.'
@@ -247,3 +213,126 @@ class UploadImageView(View):
             
         # TODO: Implement image upload and vectorization
         return JsonResponse({'message': 'Upload endpoint'})
+
+@csrf_exempt
+@require_POST
+def stripe_webhook(request):
+    """
+    Webhook handler for Stripe events.
+    """
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    try:
+        # Verify webhook signature and extract event
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError as e:
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError as e:
+        return HttpResponse(status=400)
+
+    # Handle specific event types
+    if event.type == 'checkout.session.completed':
+        session = event.data.object
+        
+        try:
+            # Get user and credit pack from metadata
+            user_id = session.metadata.get('user_id')
+            credit_pack_id = session.metadata.get('credit_pack_id')
+            
+            user = User.objects.get(id=user_id)
+            credit_pack = CreditPack.objects.get(id=credit_pack_id)
+            
+            # Create transaction record
+            Transaction.objects.create(
+                user=user,
+                transaction_type='PURCHASE',
+                credit_pack=credit_pack,
+                credits_amount=credit_pack.credits,
+                amount_paid=credit_pack.price,
+                status='COMPLETED',
+                stripe_payment_id=session.payment_intent
+            )
+            
+            # Add credits and free previews to user's account
+            user.credits += Decimal(str(credit_pack.credits))
+            user.free_previews_remaining += credit_pack.free_previews
+            user.save()
+            
+            # Send confirmation email (you can implement this later)
+            
+        except (User.DoesNotExist, CreditPack.DoesNotExist, Exception) as e:
+            # Log the error but return 200 to acknowledge receipt
+            print(f"Error processing webhook: {str(e)}")
+            return HttpResponse(status=200)
+
+    return HttpResponse(status=200)
+
+@login_required
+@require_http_methods(['POST'])
+def create_checkout_session(request):
+    """
+    Create a Stripe checkout session for credit pack purchase.
+    """
+    try:
+        data = json.loads(request.body)
+        pack_id = data.get('packId')
+        
+        if not pack_id:
+            return JsonResponse({'error': 'Pack ID is required'}, status=400)
+            
+        credit_pack = CreditPack.objects.get(id=pack_id, is_active=True)
+        
+        # Set the Stripe API key
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        
+        # Create Stripe checkout session
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'unit_amount': int(credit_pack.price * 100),  # Convert to cents
+                    'product_data': {
+                        'name': credit_pack.name,
+                        'description': f'{credit_pack.credits} credits + {credit_pack.free_previews} free previews',
+                    },
+                },
+                'quantity': 1,
+            }],
+            metadata={
+                'credit_pack_id': str(credit_pack.id),
+                'user_id': str(request.user.id),
+            },
+            mode='payment',
+            success_url=request.build_absolute_uri(reverse('core:checkout_success')),
+            cancel_url=request.build_absolute_uri(reverse('core:checkout_cancel')),
+            customer_email=request.user.email,
+        )
+        
+        return JsonResponse({
+            'sessionId': checkout_session.id
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except CreditPack.DoesNotExist:
+        return JsonResponse({'error': 'Credit pack not found'}, status=404)
+    except Exception as e:
+        print(f"Error creating checkout session: {str(e)}")  # Add debug logging
+        return JsonResponse({'error': str(e)}, status=400)
+
+def checkout_success(request):
+    """
+    Handle successful checkout.
+    """
+    return render(request, 'core/checkout_success.html')
+
+def checkout_cancel(request):
+    """
+    Handle cancelled checkout.
+    """
+    return render(request, 'core/checkout_cancel.html')

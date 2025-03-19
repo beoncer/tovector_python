@@ -1,0 +1,265 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Support - ToVector.ai{% endblock %}
+
+{% block content %}
+<div class="support-container">
+    <div class="support-header">
+        <h1>Need Help?</h1>
+        <p>We're here to assist you with any questions or concerns</p>
+    </div>
+
+    <div class="support-content">
+        <div class="contact-methods">
+            <div class="contact-card email">
+                <h2>Email Support</h2>
+                <p>Get a response within 24 hours</p>
+                <a href="mailto:support@tovector.ai" class="contact-button">
+                    Send Email
+                </a>
+            </div>
+
+            <div class="contact-card chat">
+                <h2>Live Chat</h2>
+                <p>Chat with our support team</p>
+                <button class="contact-button" onclick="initializeChat()">
+                    Start Chat
+                </button>
+            </div>
+
+            <div class="contact-card docs">
+                <h2>Documentation</h2>
+                <p>Browse our help articles</p>
+                <a href="{% url 'core:faq' %}" class="contact-button">
+                    View Docs
+                </a>
+            </div>
+        </div>
+
+        <div class="contact-form">
+            <h2>Send us a message</h2>
+            <form method="POST" action="{% url 'core:support' %}">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" name="name" required {% if user.is_authenticated %}value="{{ user.get_full_name }}"{% endif %}>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required {% if user.is_authenticated %}value="{{ user.email }}"{% endif %}>
+                </div>
+
+                <div class="form-group">
+                    <label for="subject">Subject</label>
+                    <input type="text" id="subject" name="subject" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="message">Message</label>
+                    <textarea id="message" name="message" rows="5" required></textarea>
+                </div>
+
+                <button type="submit" class="submit-button">Send Message</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="support-faq">
+        <h2>Common Questions</h2>
+        <div class="faq-items">
+            <div class="faq-item">
+                <h3>How do I get started?</h3>
+                <p>Sign up for an account, purchase credits, and start vectorizing your images instantly.</p>
+            </div>
+            <div class="faq-item">
+                <h3>What payment methods do you accept?</h3>
+                <p>We accept all major credit cards through our secure payment processor, Stripe.</p>
+            </div>
+            <div class="faq-item">
+                <h3>How long does vectorization take?</h3>
+                <p>Most images are processed within seconds. Complex images may take up to a minute.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.support-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+}
+
+.support-header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.support-header h1 {
+    font-size: 2.5rem;
+    color: #000000;
+    margin-bottom: 1rem;
+}
+
+.support-header p {
+    font-size: 1.2rem;
+    color: #666;
+}
+
+.support-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    margin-bottom: 4rem;
+}
+
+.contact-methods {
+    display: grid;
+    gap: 2rem;
+}
+
+.contact-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.contact-card h2 {
+    color: #000000;
+    margin-bottom: 1rem;
+}
+
+.contact-card p {
+    color: #666;
+    margin-bottom: 1.5rem;
+}
+
+.contact-button {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: #FF0000;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.contact-button:hover {
+    background: #cc0000;
+}
+
+.contact-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.contact-form h2 {
+    color: #000000;
+    margin-bottom: 2rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    color: #000000;
+    margin-bottom: 0.5rem;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.submit-button {
+    display: block;
+    width: 100%;
+    padding: 1rem;
+    background: #FF0000;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.submit-button:hover {
+    background: #cc0000;
+}
+
+.support-faq {
+    margin-top: 4rem;
+}
+
+.support-faq h2 {
+    text-align: center;
+    color: #000000;
+    margin-bottom: 2rem;
+}
+
+.faq-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.faq-item {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.faq-item h3 {
+    color: #000000;
+    margin-bottom: 1rem;
+}
+
+.faq-item p {
+    color: #666;
+    line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+    .support-container {
+        padding: 2rem 1rem;
+    }
+    
+    .support-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .support-header h1 {
+        font-size: 2rem;
+    }
+}
+</style>
+
+<script>
+function initializeChat() {
+    // Initialize chat functionality here
+    alert('Chat functionality coming soon!');
+}
+</script>
+{% endblock %} 

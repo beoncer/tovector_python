@@ -1,0 +1,76 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Payment Successful - ToVector.ai{% endblock %}
+
+{% block content %}
+<div class="checkout-result">
+    <div class="success-icon">✓</div>
+    <h1>Payment Successful!</h1>
+    <p>Thank you for your purchase. Your credits will be added to your account shortly.</p>
+    <div class="action-buttons">
+        <a href="{% url 'core:dashboard' %}" class="primary-button">Go to Dashboard</a>
+        <a href="{% url 'core:home' %}" class="secondary-button">Start Vectorizing</a>
+    </div>
+</div>
+
+<style>
+.checkout-result {
+    max-width: 600px;
+    margin: 4rem auto;
+    text-align: center;
+    padding: 2rem;
+}
+
+.success-icon {
+    font-size: 4rem;
+    color: #00C853;
+    margin-bottom: 1rem;
+}
+
+h1 {
+    color: #000000;
+    margin-bottom: 1rem;
+}
+
+p {
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.primary-button {
+    background: #FF0000;
+    color: #FFFFFF;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.primary-button:hover {
+    background: #cc0000;
+}
+
+.secondary-button {
+    background: #FFFFFF;
+    color: #000000;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    border: 2px solid #000000;
+    transition: all 0.2s;
+}
+
+.secondary-button:hover {
+    background: #000000;
+    color: #FFFFFF;
+}
+</style>
+{% endblock %} 

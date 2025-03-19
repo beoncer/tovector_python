@@ -1,0 +1,192 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Pricing - ToVector.ai{% endblock %}
+
+{% block content %}
+<div class="pricing-container">
+    <h1>Choose Your Plan</h1>
+    <p class="pricing-subtitle">Simple, transparent pricing with no hidden fees</p>
+
+    <div class="pricing-grid">
+        {% for pack in credit_packs %}
+        <div class="pricing-card">
+            <h2>{{ pack.name }}</h2>
+            <div class="price">
+                <span class="currency">$</span>
+                <span class="amount">{{ pack.price }}</span>
+            </div>
+            <ul class="features">
+                <li>{{ pack.credits }} credits</li>
+                <li>{{ pack.free_previews }} free previews</li>
+                <li>{{ pack.preview_credit_cost }} credits per preview</li>
+                <li>No expiration date</li>
+                <li>24/7 support</li>
+            </ul>
+            {% if user.is_authenticated %}
+                <button class="buy-button" onclick="createCheckoutSession({{ pack.id }})">Buy Now</button>
+            {% else %}
+                <a href="{% url 'core:signup' %}" class="buy-button">Sign Up to Buy</a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.pricing-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+.pricing-container h1 {
+    font-size: 2.5rem;
+    color: #000000;
+    margin-bottom: 1rem;
+}
+
+.pricing-subtitle {
+    font-size: 1.2rem;
+    color: #666;
+    margin-bottom: 3rem;
+}
+
+.pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.pricing-card {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
+}
+
+.pricing-card:hover {
+    transform: translateY(-5px);
+}
+
+.pricing-card h2 {
+    color: #000000;
+    margin-bottom: 1rem;
+}
+
+.price {
+    font-size: 2.5rem;
+    color: #FF0000;
+    margin: 1.5rem 0;
+    font-weight: bold;
+}
+
+.currency {
+    font-size: 1.5rem;
+    vertical-align: super;
+}
+
+.features {
+    list-style: none;
+    padding: 0;
+    margin: 2rem 0;
+}
+
+.features li {
+    color: #666;
+    margin: 0.8rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.features li::before {
+    content: "✓";
+    color: #FF0000;
+    margin-right: 0.5rem;
+}
+
+.buy-button {
+    display: inline-block;
+    background: #FF0000;
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    width: 100%;
+}
+
+.buy-button:hover {
+    background: #cc0000;
+}
+
+@media (max-width: 768px) {
+    .pricing-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+{% if user.is_authenticated %}
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+const stripe = Stripe('{{ stripe_public_key }}');
+
+async function createCheckoutSession(packId) {
+    try {
+        const response = await fetch('/create-checkout-session/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                packId: packId
+            })
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'An error occurred');
+        }
+        
+        // Redirect to Stripe checkout
+        const result = await stripe.redirectToCheckout({
+            sessionId: data.sessionId
+        });
+
+        if (result.error) {
+            throw new Error(result.error.message);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert(error.message || 'An error occurred. Please try again.');
+    }
+}
+
+// Helper function to get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endif %}
+{% endblock %} 
