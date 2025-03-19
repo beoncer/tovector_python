@@ -20,4 +20,5 @@ urlpatterns = [
     path('checkout/success/', views.checkout_success, name='checkout_success'),
     path('checkout/cancel/', views.checkout_cancel, name='checkout_cancel'),
     path('update-account/', views.update_account, name='update_account'),
+    path('invoice/<int:transaction_id>/', views.download_invoice, name='download_invoice'),
 ] 

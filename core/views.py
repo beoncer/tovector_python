@@ -75,7 +75,7 @@ class Auth0LoginView(View):
             
         auth0_domain = settings.AUTH0_DOMAIN
         client_id = settings.AUTH0_CLIENT_ID
-        callback_url = settings.AUTH0_CALLBACK_URL
+        callback_url = f'https://{request.get_host()}/callback/'
         
         # Debug print statements
         print("\nAuth0 Login Settings:")
@@ -110,7 +110,13 @@ class Auth0SignupView(View):
     def get(self, request):
         auth0_domain = settings.AUTH0_DOMAIN
         client_id = settings.AUTH0_CLIENT_ID
-        callback_url = settings.AUTH0_CALLBACK_URL
+        callback_url = f'https://{request.get_host()}/callback/'
+        
+        # Debug print statements
+        print("\nAuth0 Signup Settings:")
+        print(f"Domain: {auth0_domain}")
+        print(f"Client ID: {client_id}")
+        print(f"Callback URL: {callback_url}")
         
         # Build the authorization URL with signup hint
         params = {
@@ -118,11 +124,15 @@ class Auth0SignupView(View):
             'client_id': client_id,
             'redirect_uri': callback_url,
             'scope': 'openid profile email',
-            'screen_hint': 'signup'
+            'screen_hint': 'signup',
+            'prompt': 'login'
         }
         
         # Use urlencode to properly encode the parameters
         auth_url = f'https://{auth0_domain}/authorize?{urlencode(params)}'
+        
+        # Debug print final URL
+        print(f"Final Signup URL: {auth_url}")
         
         return redirect(auth_url)
 
@@ -181,17 +191,16 @@ class Auth0CallbackView(View):
                 'client_id': settings.AUTH0_CLIENT_ID,
                 'client_secret': settings.AUTH0_CLIENT_SECRET,
                 'code': code,
-                'redirect_uri': settings.AUTH0_CALLBACK_URL,
+                'redirect_uri': f'https://{request.get_host()}/callback/',
                 'grant_type': 'authorization_code',
             }
             
             # Debug print token request details
-            print("\nToken Request:")
+            print("\nToken Request Details:")
             print(f"URL: {token_url}")
             print(f"Client ID: {settings.AUTH0_CLIENT_ID}")
-            print(f"Client Secret: {'*' * 8}cret")
+            print(f"Redirect URI: {token_payload['redirect_uri']}")
             print(f"Code: {code}")
-            print(f"Redirect URI: {settings.AUTH0_CALLBACK_URL}")
             
             token_response = requests.post(token_url, json=token_payload)
             
@@ -200,7 +209,14 @@ class Auth0CallbackView(View):
             print(f"Status Code: {token_response.status_code}")
             print(f"Response: {token_response.text}")
             
-            token_response.raise_for_status()
+            if token_response.status_code != 200:
+                error_data = token_response.json()
+                error_message = error_data.get('error_description', 'Failed to authenticate with Auth0')
+                print(f"\nAuth0 Error: {error_message}")
+                return render(request, 'core/error.html', {
+                    'error': error_message
+                })
+            
             token_data = token_response.json()
 
             # Get user info from Auth0
@@ -209,8 +225,15 @@ class Auth0CallbackView(View):
                 user_url,
                 headers={'Authorization': f'Bearer {token_data["access_token"]}'}
             )
-            user_response.raise_for_status()
+            
+            if user_response.status_code != 200:
+                print(f"\nUser Info Error: {user_response.text}")
+                return render(request, 'core/error.html', {
+                    'error': 'Failed to get user information'
+                })
+                
             user_info = user_response.json()
+            print(f"\nUser Info: {user_info}")
 
             # Get or create user
             email = user_info['email']
@@ -218,11 +241,31 @@ class Auth0CallbackView(View):
                 user = User.objects.get(email=email)
                 created = False
             except User.DoesNotExist:
+                # Generate a unique username from the email
+                base_username = email.split('@')[0]
+                username = base_username
+                counter = 1
+                
+                # Keep trying until we find a unique username
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}{counter}"
+                    counter += 1
+                
+                # Create the user with the unique username
                 user = User.objects.create(
+                    username=username,
                     email=email,
                     is_active=True,
                     credits=settings.INITIAL_FREE_CREDITS
                 )
+                
+                # Update user's profile information if available
+                if user_info.get('given_name'):
+                    user.first_name = user_info['given_name']
+                if user_info.get('family_name'):
+                    user.last_name = user_info['family_name']
+                user.save()
+                
                 created = True
 
             # Clear any existing session first
@@ -247,13 +290,13 @@ class Auth0CallbackView(View):
             return redirect('core:dashboard')
 
         except requests.exceptions.RequestException as e:
-            print(f"Request Error: {e}")
+            print(f"\nRequest Error: {e}")
             print(f"Response: {e.response.text if hasattr(e, 'response') else 'No response'}")
             return render(request, 'core/error.html', {
-                'error': 'Failed to authenticate with Auth0'
+                'error': 'Failed to authenticate. Please ensure your Auth0 configuration is correct.'
             })
         except Exception as e:
-            print(f"Unexpected error: {str(e)}")
+            print(f"\nUnexpected error: {str(e)}")
             return render(request, 'core/error.html', {
                 'error': 'An unexpected error occurred'
             })
@@ -402,3 +445,39 @@ def update_account(request):
     user.save()
     
     return JsonResponse({'status': 'success'})
+
+@login_required
+def download_invoice(request, transaction_id):
+    """Handle invoice downloads for transactions."""
+    try:
+        # Ensure the transaction belongs to the requesting user
+        transaction = Transaction.objects.get(id=transaction_id, user=request.user)
+        
+        # For now, return a simple text response
+        # TODO: Implement proper PDF invoice generation
+        response = HttpResponse(content_type='text/plain')
+        response['Content-Disposition'] = f'attachment; filename="invoice_{transaction_id}.txt"'
+        
+        # Write invoice content
+        content = [
+            f"INVOICE #{transaction.id}",
+            "=" * 40,
+            f"Date: {transaction.created_at.strftime('%Y-%m-%d')}",
+            f"Transaction Type: {transaction.transaction_type}",
+            f"Credits: {transaction.credits_amount}",
+            f"Amount: ${transaction.amount_paid}",
+            f"Status: {transaction.status}",
+            "=" * 40,
+            f"Customer: {request.user.email}",
+            f"Company: {request.user.company_name or 'N/A'}",
+            f"VAT ID: {request.user.vat_id or 'N/A'}",
+            f"Billing Address: {request.user.billing_address or 'N/A'}"
+        ]
+        
+        response.write('\n'.join(content))
+        return response
+        
+    except Transaction.DoesNotExist:
+        return render(request, 'core/error.html', {
+            'error': 'Invoice not found'
+        })
