@@ -10,37 +10,486 @@
         <div class="credits-display">
             <span class="credits-label">Available Credits:</span>
             <span class="credits-amount">{{ request.user.credits }}</span>
+            <a href="{% url 'core:pricing' %}" class="buy-credits-button">Buy More Credits</a>
         </div>
     </div>
 
     <div class="dashboard-content">
         <div class="dashboard-section">
-            <h2>Recent Vectorizations</h2>
-            <div class="empty-state">
-                <p>You haven't vectorized any images yet.</p>
-                <a href="{% url 'core:home' %}" class="primary-button">Start Vectorizing</a>
+            <div class="section-header">
+                <h2>Account Information</h2>
+                <button type="button" id="editButton" class="edit-button">Edit</button>
             </div>
+            <form id="accountForm" method="POST" action="{% url 'core:update_account' %}">
+                {% csrf_token %}
+                <div class="account-info">
+                    <div class="info-row">
+                        <span class="label">Email:</span>
+                        <input type="email" value="{{ request.user.email }}" class="form-input" disabled>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Company:</span>
+                        <input type="text" name="company_name" value="{{ request.user.company_name|default:'' }}" 
+                               class="form-input editable" placeholder="Enter company name" disabled>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Billing Address:</span>
+                        <textarea name="billing_address" class="form-textarea editable" rows="3" 
+                                  placeholder="Enter billing address" disabled>{{ request.user.billing_address|default:'' }}</textarea>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">VAT ID:</span>
+                        <input type="text" name="vat_id" value="{{ request.user.vat_id|default:'' }}" 
+                               class="form-input editable" placeholder="Enter VAT ID" disabled>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Member Since:</span>
+                        <input type="text" value="{{ request.user.date_joined|date:'F j, Y' }}" class="form-input" disabled>
+                    </div>
+                    <div class="info-row">
+                        <button type="submit" id="saveButton" class="save-button" style="display: none;">Save Changes</button>
+                    </div>
+                </div>
+            </form>
         </div>
 
         <div class="dashboard-section">
-            <h2>Account Information</h2>
-            <div class="account-info">
-                <div class="info-row">
-                    <span class="label">Email:</span>
-                    <span class="value">{{ request.user.email }}</span>
+            <h2>Recent Vectorizations</h2>
+            {% if vectorizations %}
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Filename</th>
+                                <th>Credits Used</th>
+                                <th>Status</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for vectorization in vectorizations %}
+                            <tr>
+                                <td>{{ vectorization.created_at|date:"M j, Y H:i" }}</td>
+                                <td>{{ vectorization.filename }}</td>
+                                <td>{{ vectorization.credits_used }}</td>
+                                <td>{{ vectorization.status }}</td>
+                                <td>
+                                    {% if vectorization.result_url %}
+                                        <a href="{{ vectorization.result_url }}" target="_blank" class="download-link">Download</a>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-                {% if request.user.company_name %}
-                <div class="info-row">
-                    <span class="label">Company:</span>
-                    <span class="value">{{ request.user.company_name }}</span>
+            {% else %}
+                <div class="empty-state">
+                    <p>No vectorizations yet. Start vectorizing your first image!</p>
                 </div>
-                {% endif %}
-                <div class="info-row">
-                    <span class="label">Member Since:</span>
-                    <span class="value">{{ request.user.date_joined|date:"F j, Y" }}</span>
+            {% endif %}
+        </div>
+
+        <div class="dashboard-section">
+            <h2>Transaction History</h2>
+            {% if transactions %}
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Credits</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Invoice</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transaction in transactions %}
+                            <tr>
+                                <td>{{ transaction.created_at|date:"M j, Y H:i" }}</td>
+                                <td>{{ transaction.transaction_type }}</td>
+                                <td>{{ transaction.credits_amount }}</td>
+                                <td>${{ transaction.amount_paid }}</td>
+                                <td>{{ transaction.status }}</td>
+                                <td>
+                                    {% if transaction.status == 'COMPLETED' %}
+                                        <a href="{% url 'core:download_invoice' transaction.id %}" class="download-link">Download</a>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-            </div>
+            {% else %}
+                <div class="empty-state">
+                    <p>No transactions yet.</p>
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>
+
+<style>
+.dashboard-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    margin-top: 3rem;
+}
+
+.dashboard-header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    color: #000000;
+}
+
+.credits-display {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.75rem 1.25rem;
+    background: #f8f8f8;
+    border-radius: 8px;
+}
+
+.credits-label {
+    font-size: 1rem;
+    color: #666;
+    white-space: nowrap;
+}
+
+.credits-amount {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #000000;
+    white-space: nowrap;
+}
+
+.buy-credits-button {
+    background: #FF0000;
+    color: #FFFFFF;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    white-space: nowrap;
+}
+
+.buy-credits-button:hover {
+    background: #cc0000;
+}
+
+.dashboard-section {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.section-header h2 {
+    margin: 0;
+    color: #000000;
+    font-size: 1.5rem;
+}
+
+.edit-button {
+    background: #007bff;
+    color: white;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.edit-button:hover {
+    background: #0056b3;
+}
+
+.edit-button.cancel {
+    background: #dc3545;
+}
+
+.edit-button.cancel:hover {
+    background: #c82333;
+}
+
+.form-input:not(:disabled),
+.form-textarea:not(:disabled) {
+    background: #ffffff;
+    border-color: #007bff;
+}
+
+.form-input:disabled,
+.form-textarea:disabled {
+    background: #f8f8f8;
+    cursor: not-allowed;
+    color: #333;
+    border-color: #ddd;
+}
+
+.account-info {
+    display: grid;
+    gap: 1rem;
+}
+
+.info-row {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.info-row .label {
+    font-weight: bold;
+    color: #666;
+    min-width: 150px;
+    padding-top: 0.5rem;
+}
+
+.form-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    background-color: #fff;
+}
+
+.form-input:disabled {
+    background: #f8f8f8;
+    cursor: not-allowed;
+    color: #333;
+}
+
+.form-textarea {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    min-height: 80px;
+    resize: vertical;
+    background-color: #fff;
+}
+
+.form-textarea:disabled {
+    background: #f8f8f8;
+    cursor: not-allowed;
+    color: #333;
+}
+
+.save-button {
+    background: #28a745;
+    color: white;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    margin-left: 150px;
+    transition: background-color 0.2s;
+}
+
+.save-button:hover {
+    background: #218838;
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.data-table th {
+    background: #f8f8f8;
+    font-weight: bold;
+    color: #000000;
+}
+
+.data-table td {
+    color: #666;
+}
+
+.download-link {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.download-link:hover {
+    text-decoration: underline;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+}
+
+/* Success Toast */
+#successToast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #28a745;
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 4px;
+    display: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 768px) {
+    .dashboard-container {
+        padding: 1rem;
+    }
+
+    .dashboard-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .credits-display {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .info-row {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .info-row .label {
+        min-width: auto;
+    }
+
+    .save-button {
+        margin-left: 0;
+        width: 100%;
+    }
+}
+</style>
+
+<!-- Success Toast -->
+<div id="successToast" style="display: none;">
+    Changes saved successfully!
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editButton = document.getElementById('editButton');
+    const saveButton = document.getElementById('saveButton');
+    const editableFields = document.querySelectorAll('.editable');
+    const accountForm = document.getElementById('accountForm');
+    let originalValues = {};
+
+    // Store original values
+    editableFields.forEach(field => {
+        originalValues[field.name] = field.value;
+    });
+
+    editButton.addEventListener('click', function() {
+        const isEditing = editButton.classList.contains('cancel');
+        
+        editableFields.forEach(field => {
+            field.disabled = isEditing;
+            if (isEditing) {
+                // Reset to original value when canceling
+                field.value = originalValues[field.name];
+            }
+        });
+
+        if (isEditing) {
+            // Cancel editing
+            editButton.textContent = 'Edit';
+            editButton.classList.remove('cancel');
+            saveButton.style.display = 'none';
+        } else {
+            // Start editing
+            editButton.textContent = 'Cancel';
+            editButton.classList.add('cancel');
+            saveButton.style.display = 'block';
+        }
+    });
+
+    accountForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        try {
+            const response = await fetch(this.action, {
+                method: 'POST',
+                body: new FormData(this),
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            });
+            
+            if (response.ok) {
+                // Update original values after successful save
+                editableFields.forEach(field => {
+                    originalValues[field.name] = field.value;
+                });
+
+                // Reset UI to non-editing state
+                editButton.textContent = 'Edit';
+                editButton.classList.remove('cancel');
+                saveButton.style.display = 'none';
+                editableFields.forEach(field => {
+                    field.disabled = true;
+                });
+
+                // Show success message
+                const toast = document.getElementById('successToast');
+                toast.style.display = 'block';
+                setTimeout(() => {
+                    toast.style.display = 'none';
+                }, 3000);
+            } else {
+                alert('Failed to save changes. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+        }
+    });
+});
+</script>
 {% endblock %} 

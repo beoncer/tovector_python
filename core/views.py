@@ -10,13 +10,14 @@ from django.core.exceptions import SuspiciousOperation
 from urllib.parse import urlencode
 import requests
 import json
-from .models import CreditPack, User, Transaction
+from .models import CreditPack, User, Transaction, Vectorization
 import stripe
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from decimal import Decimal
+import time
 
 def home(request):
     """Homepage view."""
@@ -28,7 +29,13 @@ def home(request):
 @login_required
 def dashboard(request):
     """User dashboard view."""
-    return render(request, 'core/dashboard.html')
+    transactions = Transaction.objects.filter(user=request.user).order_by('-created_at')[:10]
+    vectorizations = Vectorization.objects.filter(user=request.user).order_by('-created_at')[:10]
+    
+    return render(request, 'core/dashboard.html', {
+        'transactions': transactions,
+        'vectorizations': vectorizations,
+    })
 
 def pricing(request):
     """
@@ -56,6 +63,10 @@ def how_it_works(request):
 class Auth0LoginView(View):
     """Handle Auth0 login."""
     def get(self, request):
+        # Clear any existing session
+        request.session.flush()
+        logout(request)
+        
         # If no connection is specified, show the login page
         if not request.GET.get('connection'):
             return render(request, 'core/login.html', {
@@ -67,10 +78,11 @@ class Auth0LoginView(View):
         callback_url = settings.AUTH0_CALLBACK_URL
         
         # Debug print statements
-        print("Auth0 Settings:")
+        print("\nAuth0 Login Settings:")
         print(f"Domain: {auth0_domain}")
         print(f"Client ID: {client_id}")
         print(f"Callback URL: {callback_url}")
+        print(f"Connection: {request.GET.get('connection')}")
         
         # Build the authorization URL
         params = {
@@ -79,6 +91,7 @@ class Auth0LoginView(View):
             'redirect_uri': callback_url,
             'scope': 'openid profile email',
             'connection': request.GET.get('connection'),
+            'prompt': 'login',  # Force login prompt
         }
         
         # Remove None values from params
@@ -116,92 +129,133 @@ class Auth0SignupView(View):
 class Auth0LogoutView(View):
     """Handle Auth0 logout."""
     def get(self, request):
+        # Clear the Django session
+        request.session.flush()
+        
         # Clear the user's session
         logout(request)
         
-        # Redirect to Auth0 logout endpoint
+        # Get the domain
+        domain = request.get_host()
+        
+        # Build the return URL - always use HTTPS
+        return_to = f'https://{domain}/'
+        
+        # Build Auth0 logout URL with proper parameters
         params = {
             'client_id': settings.AUTH0_CLIENT_ID,
-            'returnTo': request.build_absolute_uri('/'),
+            'returnTo': return_to,
         }
-        return redirect(f'https://{settings.AUTH0_DOMAIN}/v2/logout?{urlencode(params)}')
+        
+        # Build the Auth0 logout URL with properly encoded parameters
+        auth0_logout_url = f'https://{settings.AUTH0_DOMAIN}/v2/logout?{urlencode(params)}'
+        
+        print("\nAuth0 Logout Settings:")
+        print(f"Domain: {settings.AUTH0_DOMAIN}")
+        print(f"Client ID: {settings.AUTH0_CLIENT_ID}")
+        print(f"Domain: {domain}")
+        print(f"Return URL: {return_to}")
+        print(f"Logout URL: {auth0_logout_url}")
+        
+        # Set no-cache headers to prevent browser caching
+        response = redirect(auth0_logout_url)
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        
+        return response
 
 class Auth0CallbackView(View):
     """Handle Auth0 callback."""
     def get(self, request):
-        code = request.GET.get('code')
-        error = request.GET.get('error')
-        error_description = request.GET.get('error_description')
-        
-        if error:
-            # Handle authentication error
-            return render(request, 'core/auth_error.html', {
-                'error': error,
-                'error_description': error_description
-            })
-            
+        code = request.GET.get('code', None)
         if not code:
-            return redirect('home')
-            
+            return render(request, 'core/error.html', {
+                'error': 'No authorization code received'
+            })
+
         try:
-            # Exchange the authorization code for tokens
+            # Get token from Auth0
             token_url = f'https://{settings.AUTH0_DOMAIN}/oauth/token'
             token_payload = {
                 'client_id': settings.AUTH0_CLIENT_ID,
                 'client_secret': settings.AUTH0_CLIENT_SECRET,
                 'code': code,
                 'redirect_uri': settings.AUTH0_CALLBACK_URL,
-                'grant_type': 'authorization_code'
+                'grant_type': 'authorization_code',
             }
             
-            token_response = requests.post(token_url, json=token_payload)
-            token_response.raise_for_status()  # Raise exception for bad status codes
-            tokens = token_response.json()
+            # Debug print token request details
+            print("\nToken Request:")
+            print(f"URL: {token_url}")
+            print(f"Client ID: {settings.AUTH0_CLIENT_ID}")
+            print(f"Client Secret: {'*' * 8}cret")
+            print(f"Code: {code}")
+            print(f"Redirect URI: {settings.AUTH0_CALLBACK_URL}")
             
+            token_response = requests.post(token_url, json=token_payload)
+            
+            # Debug print token response
+            print("\nToken Response:")
+            print(f"Status Code: {token_response.status_code}")
+            print(f"Response: {token_response.text}")
+            
+            token_response.raise_for_status()
+            token_data = token_response.json()
+
             # Get user info from Auth0
             user_url = f'https://{settings.AUTH0_DOMAIN}/userinfo'
             user_response = requests.get(
                 user_url,
-                headers={'Authorization': f'Bearer {tokens["access_token"]}'}
+                headers={'Authorization': f'Bearer {token_data["access_token"]}'}
             )
             user_response.raise_for_status()
-            auth0_user = user_response.json()
-            
+            user_info = user_response.json()
+
             # Get or create user
+            email = user_info['email']
             try:
-                user = User.objects.get(email=auth0_user['email'])
+                user = User.objects.get(email=email)
+                created = False
             except User.DoesNotExist:
                 user = User.objects.create(
-                    email=auth0_user['email'],
-                    username=auth0_user['email'],  # Use email as username
-                    first_name=auth0_user.get('given_name', ''),
-                    last_name=auth0_user.get('family_name', ''),
-                    is_active=True
+                    email=email,
+                    is_active=True,
+                    credits=settings.INITIAL_FREE_CREDITS
                 )
-                # Set unusable password since we're using Auth0
-                user.set_unusable_password()
-                user.save()
-                
-                # Initialize with free credits if specified
-                if hasattr(settings, 'INITIAL_FREE_CREDITS'):
-                    user.credits = settings.INITIAL_FREE_CREDITS
-                    user.save()
+                created = True
+
+            # Clear any existing session first
+            request.session.flush()
             
-            # Log the user in
+            # Login user
             login(request, user)
-            return redirect('core:dashboard')
             
+            # Set session expiry to browser close
+            request.session.set_expiry(0)
+            
+            # Store tokens in session
+            request.session['access_token'] = token_data['access_token']
+            request.session['id_token'] = token_data['id_token']
+            request.session['auth_time'] = int(time.time())
+            
+            # If this is a new user, initialize their credits
+            if created:
+                user.credits = settings.INITIAL_FREE_CREDITS
+                user.save()
+            
+            return redirect('core:dashboard')
+
         except requests.exceptions.RequestException as e:
-            # Handle request errors
-            return render(request, 'core/auth_error.html', {
-                'error': 'Authentication Error',
-                'error_description': str(e)
+            print(f"Request Error: {e}")
+            print(f"Response: {e.response.text if hasattr(e, 'response') else 'No response'}")
+            return render(request, 'core/error.html', {
+                'error': 'Failed to authenticate with Auth0'
             })
         except Exception as e:
-            # Handle other errors
-            return render(request, 'core/auth_error.html', {
-                'error': 'System Error',
-                'error_description': 'An unexpected error occurred. Please try again.'
+            print(f"Unexpected error: {str(e)}")
+            return render(request, 'core/error.html', {
+                'error': 'An unexpected error occurred'
             })
 
 @method_decorator(require_http_methods(['POST']), name='dispatch')
@@ -336,3 +390,15 @@ def checkout_cancel(request):
     Handle cancelled checkout.
     """
     return render(request, 'core/checkout_cancel.html')
+
+@login_required
+@require_http_methods(['POST'])
+def update_account(request):
+    """Update user account information."""
+    user = request.user
+    user.company_name = request.POST.get('company_name', '')
+    user.billing_address = request.POST.get('billing_address', '')
+    user.vat_id = request.POST.get('vat_id', '')
+    user.save()
+    
+    return JsonResponse({'status': 'success'})

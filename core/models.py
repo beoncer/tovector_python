@@ -91,3 +91,28 @@ class Transaction(models.Model):
             self.invoice_number = f'INV-{date_str}-{new_number:04d}'
         
         super().save(*args, **kwargs)
+
+class Vectorization(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vectorizations')
+    filename = models.CharField(_('Filename'), max_length=255)
+    credits_used = models.DecimalField(_('Credits Used'), max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(_('Created At'), auto_now_add=True)
+    status = models.CharField(
+        _('Status'),
+        max_length=20,
+        choices=[
+            ('PENDING', _('Pending')),
+            ('COMPLETED', _('Completed')),
+            ('FAILED', _('Failed')),
+        ],
+        default='PENDING'
+    )
+    result_url = models.URLField(_('Result URL'), blank=True)
+
+    class Meta:
+        verbose_name = _('Vectorization')
+        verbose_name_plural = _('Vectorizations')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.filename} - {self.created_at}"
