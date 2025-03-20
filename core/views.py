@@ -236,13 +236,20 @@ class Auth0CallbackView(View):
             print(f"\nUser Info: {user_info}")
 
             # Get or create user
-            email = user_info['email']
+            # For Facebook login, use sub as unique identifier if email is not available
+            if 'email' in user_info:
+                user_identifier = user_info['email']
+            else:
+                user_identifier = user_info['sub']  # Facebook user ID
+
             try:
-                user = User.objects.get(email=email)
+                user = User.objects.get(email=user_identifier)
                 created = False
+                print(f"\nFound existing user: {user.email}")
             except User.DoesNotExist:
-                # Generate a unique username from the email
-                base_username = email.split('@')[0]
+                print("\nCreating new user...")
+                # Generate a unique username from the name or sub
+                base_username = user_info.get('nickname', user_info['sub']).lower().replace(' ', '_')
                 username = base_username
                 counter = 1
                 
@@ -251,43 +258,56 @@ class Auth0CallbackView(View):
                     username = f"{base_username}{counter}"
                     counter += 1
                 
-                # Create the user with the unique username
-                user = User.objects.create(
-                    username=username,
-                    email=email,
-                    is_active=True,
-                    credits=settings.INITIAL_FREE_CREDITS
-                )
+                print(f"Generated username: {username}")
                 
-                # Update user's profile information if available
-                if user_info.get('given_name'):
-                    user.first_name = user_info['given_name']
-                if user_info.get('family_name'):
-                    user.last_name = user_info['family_name']
-                user.save()
-                
-                created = True
+                try:
+                    # Create new user with Auth0 data
+                    user = User.objects.create_user(
+                        username=username,
+                        email=user_identifier,  # Use sub as email for Facebook users
+                        first_name=user_info.get('given_name', ''),
+                        last_name=user_info.get('family_name', ''),
+                        is_active=True
+                    )
+                    created = True
+                    
+                    # Set initial credits for new users
+                    user.credits = settings.INITIAL_FREE_CREDITS
+                    user.save()
+                    
+                    print(f"\nSuccessfully created new user: {user.email}")
+                except Exception as e:
+                    print(f"\nError creating user: {str(e)}")
+                    raise
 
-            # Clear any existing session first
-            request.session.flush()
-            
-            # Login user
-            login(request, user)
-            
-            # Set session expiry to browser close
-            request.session.set_expiry(0)
-            
-            # Store tokens in session
-            request.session['access_token'] = token_data['access_token']
-            request.session['id_token'] = token_data['id_token']
-            request.session['auth_time'] = int(time.time())
-            
-            # If this is a new user, initialize their credits
-            if created:
-                user.credits = settings.INITIAL_FREE_CREDITS
-                user.save()
-            
-            return redirect('core:dashboard')
+            try:
+                # Clear any existing session first
+                request.session.flush()
+                
+                # Login user
+                login(request, user)
+                print("\nSuccessfully logged in user")
+                
+                # Set session expiry to browser close
+                request.session.set_expiry(0)
+                
+                # Store tokens in session
+                request.session['access_token'] = token_data['access_token']
+                request.session['id_token'] = token_data['id_token']
+                request.session['auth_time'] = int(time.time())
+                print("\nSuccessfully stored tokens in session")
+                
+                # If this is a new user, initialize their credits
+                if created:
+                    user.credits = settings.INITIAL_FREE_CREDITS
+                    user.save()
+                    print("\nInitialized credits for new user")
+                
+                return redirect('core:dashboard')
+                
+            except Exception as e:
+                print(f"\nError during login/session setup: {str(e)}")
+                raise
 
         except requests.exceptions.RequestException as e:
             print(f"\nRequest Error: {e}")
@@ -296,9 +316,11 @@ class Auth0CallbackView(View):
                 'error': 'Failed to authenticate. Please ensure your Auth0 configuration is correct.'
             })
         except Exception as e:
-            print(f"\nUnexpected error: {str(e)}")
+            print(f"\nError in Auth0 callback: {str(e)}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             return render(request, 'core/error.html', {
-                'error': 'An unexpected error occurred'
+                'error': 'An unexpected error occurred during authentication'
             })
 
 @method_decorator(require_http_methods(['POST']), name='dispatch')
@@ -321,30 +343,46 @@ def stripe_webhook(request):
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
+    print("\nReceived Stripe webhook:")
+    print(f"Signature: {sig_header}")
+    print(f"Payload: {payload.decode('utf-8')}")
+
     try:
         # Verify webhook signature and extract event
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
+        print(f"\nVerified webhook signature for event: {event.type}")
     except ValueError as e:
+        print(f"\nInvalid payload: {str(e)}")
         return HttpResponse(status=400)
     except stripe.error.SignatureVerificationError as e:
+        print(f"\nInvalid signature: {str(e)}")
         return HttpResponse(status=400)
 
     # Handle specific event types
     if event.type == 'checkout.session.completed':
         session = event.data.object
+        print(f"\nProcessing checkout.session.completed event:")
+        print(f"Session ID: {session.id}")
+        print(f"Payment Intent: {session.payment_intent}")
+        print(f"Metadata: {session.metadata}")
         
         try:
             # Get user and credit pack from metadata
             user_id = session.metadata.get('user_id')
             credit_pack_id = session.metadata.get('credit_pack_id')
             
+            print(f"\nLooking up user {user_id} and credit pack {credit_pack_id}")
+            
             user = User.objects.get(id=user_id)
             credit_pack = CreditPack.objects.get(id=credit_pack_id)
             
+            print(f"Found user: {user.email}")
+            print(f"Found credit pack: {credit_pack.name}")
+            
             # Create transaction record
-            Transaction.objects.create(
+            transaction = Transaction.objects.create(
                 user=user,
                 transaction_type='PURCHASE',
                 credit_pack=credit_pack,
@@ -353,17 +391,20 @@ def stripe_webhook(request):
                 status='COMPLETED',
                 stripe_payment_id=session.payment_intent
             )
+            print(f"Created transaction: {transaction.id}")
             
             # Add credits and free previews to user's account
             user.credits += Decimal(str(credit_pack.credits))
             user.free_previews_remaining += credit_pack.free_previews
             user.save()
             
-            # Send confirmation email (you can implement this later)
+            print(f"Updated user credits: {user.credits}")
+            print(f"Updated free previews: {user.free_previews_remaining}")
             
         except (User.DoesNotExist, CreditPack.DoesNotExist, Exception) as e:
-            # Log the error but return 200 to acknowledge receipt
-            print(f"Error processing webhook: {str(e)}")
+            print(f"\nError processing webhook: {str(e)}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             return HttpResponse(status=200)
 
     return HttpResponse(status=200)
@@ -386,6 +427,13 @@ def create_checkout_session(request):
         # Set the Stripe API key
         stripe.api_key = settings.STRIPE_SECRET_KEY
         
+        # Check if user's email is actually an Auth0 sub ID (for Facebook logins)
+        user_email = request.user.email
+        if '|' in user_email:  # This indicates it's an Auth0 sub ID
+            # Create a placeholder email using the sub ID
+            sub_id = user_email.split('|')[1]
+            user_email = f'facebook_{sub_id}@placeholder.com'
+        
         # Create Stripe checkout session
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
@@ -407,7 +455,7 @@ def create_checkout_session(request):
             mode='payment',
             success_url=request.build_absolute_uri(reverse('core:checkout_success')),
             cancel_url=request.build_absolute_uri(reverse('core:checkout_cancel')),
-            customer_email=request.user.email,
+            customer_email=user_email,
         )
         
         return JsonResponse({
@@ -422,11 +470,49 @@ def create_checkout_session(request):
         print(f"Error creating checkout session: {str(e)}")  # Add debug logging
         return JsonResponse({'error': str(e)}, status=400)
 
+@login_required
 def checkout_success(request):
-    """
-    Handle successful checkout.
-    """
-    return render(request, 'core/checkout_success.html')
+    """Handle successful checkout."""
+    print("\nCheckout Success View:")
+    print(f"User: {request.user.email}")
+    print(f"Current credits: {request.user.credits}")
+    
+    # Get the latest transaction for this user
+    latest_transaction = Transaction.objects.filter(
+        user=request.user,
+        transaction_type='PURCHASE'
+    ).order_by('-created_at').first()
+    
+    if latest_transaction:
+        print(f"Latest transaction: {latest_transaction.id}")
+        print(f"Transaction status: {latest_transaction.status}")
+        print(f"Credits amount: {latest_transaction.credits_amount}")
+        print(f"Credit pack: {latest_transaction.credit_pack.name}")
+        
+        # Check if credits were actually added
+        if latest_transaction.status == 'COMPLETED':
+            print("Transaction is completed, checking credit update...")
+            # Refresh user from database to get latest state
+            request.user.refresh_from_db()
+            print(f"Updated credits: {request.user.credits}")
+            
+            return render(request, 'core/checkout_success.html', {
+                'transaction': latest_transaction,
+                'credits_added': latest_transaction.credits_amount,
+                'new_balance': request.user.credits,
+                'credit_pack': latest_transaction.credit_pack
+            })
+        else:
+            print("Transaction is not completed yet")
+            return render(request, 'core/checkout_success.html', {
+                'transaction': latest_transaction,
+                'status': 'pending'
+            })
+    else:
+        print("No recent transactions found")
+        return render(request, 'core/checkout_success.html', {
+            'status': 'no_transaction'
+        })
 
 def checkout_cancel(request):
     """

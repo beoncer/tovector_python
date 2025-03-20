@@ -154,7 +154,7 @@ AUTH_USER_MODEL = 'core.User'
 AUTH0_DOMAIN = config('AUTH0_DOMAIN')
 AUTH0_CLIENT_ID = config('AUTH0_CLIENT_ID')
 AUTH0_CLIENT_SECRET = config('AUTH0_CLIENT_SECRET')
-AUTH0_CALLBACK_URL = 'https://efbd-2001-7d0-8224-e00-3dfd-a15d-15e8-1df1.ngrok-free.app/callback/'
+AUTH0_CALLBACK_URL = 'https://14de-2001-7d0-8224-e00-c85a-f6d7-4e2b-efde.ngrok-free.app/callback/'
 
 # Print Auth0 settings for debugging
 print("\nAuth0 Settings:")
