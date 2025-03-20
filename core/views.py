@@ -18,6 +18,11 @@ from django.views.decorators.http import require_POST
 from django.urls import reverse
 from decimal import Decimal
 import time
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from io import BytesIO
 
 def home(request):
     """Homepage view."""
@@ -539,28 +544,74 @@ def download_invoice(request, transaction_id):
         # Ensure the transaction belongs to the requesting user
         transaction = Transaction.objects.get(id=transaction_id, user=request.user)
         
-        # For now, return a simple text response
-        # TODO: Implement proper PDF invoice generation
-        response = HttpResponse(content_type='text/plain')
-        response['Content-Disposition'] = f'attachment; filename="invoice_{transaction_id}.txt"'
+        # Create a file-like buffer to receive PDF data
+        buffer = BytesIO()
         
-        # Write invoice content
-        content = [
-            f"INVOICE #{transaction.id}",
-            "=" * 40,
-            f"Date: {transaction.created_at.strftime('%Y-%m-%d')}",
-            f"Transaction Type: {transaction.transaction_type}",
-            f"Credits: {transaction.credits_amount}",
-            f"Amount: ${transaction.amount_paid}",
-            f"Status: {transaction.status}",
-            "=" * 40,
-            f"Customer: {request.user.email}",
-            f"Company: {request.user.company_name or 'N/A'}",
-            f"VAT ID: {request.user.vat_id or 'N/A'}",
-            f"Billing Address: {request.user.billing_address or 'N/A'}"
-        ]
+        # Create the PDF object, using the buffer as its "file."
+        p = canvas.Canvas(buffer, pagesize=letter)
         
-        response.write('\n'.join(content))
+        # Set font
+        p.setFont("Helvetica-Bold", 24)
+        
+        # Draw the logo text (since we're using a text-based logo for now)
+        p.drawString(1*inch, 10*inch, "ToVector.ai")
+        
+        # Add invoice details
+        p.setFont("Helvetica-Bold", 16)
+        p.drawString(1*inch, 9*inch, f"INVOICE #{transaction.invoice_number}")
+        
+        # Add date
+        p.setFont("Helvetica", 12)
+        p.drawString(1*inch, 8.5*inch, f"Date: {transaction.created_at.strftime('%Y-%m-%d')}")
+        
+        # Add billing information
+        p.setFont("Helvetica-Bold", 14)
+        p.drawString(1*inch, 7.5*inch, "BILLING INFORMATION")
+        p.setFont("Helvetica", 12)
+        p.drawString(1*inch, 7*inch, f"Customer: {request.user.get_full_name() or request.user.email}")
+        p.drawString(1*inch, 6.7*inch, f"Company: {request.user.company_name or 'N/A'}")
+        p.drawString(1*inch, 6.4*inch, f"VAT ID: {request.user.vat_id or 'N/A'}")
+        
+        # Handle multi-line billing address
+        billing_address = request.user.billing_address or 'N/A'
+        y_position = 6.1
+        for line in billing_address.split('\n'):
+            p.drawString(1*inch, y_position*inch, f"Billing Address: {line}")
+            y_position -= 0.3
+        
+        # Add transaction details
+        p.setFont("Helvetica-Bold", 14)
+        p.drawString(1*inch, 5*inch, "TRANSACTION DETAILS")
+        p.setFont("Helvetica", 12)
+        p.drawString(1*inch, 4.5*inch, f"Transaction Type: {transaction.transaction_type}")
+        p.drawString(1*inch, 4.2*inch, f"Credits: {transaction.credits_amount}")
+        p.drawString(1*inch, 3.9*inch, f"Amount: ${transaction.amount_paid:.2f} USD")
+        p.drawString(1*inch, 3.6*inch, f"Status: {transaction.status}")
+        p.drawString(1*inch, 3.3*inch, f"Payment ID: {transaction.stripe_payment_id}")
+        
+        # Add footer
+        p.setFont("Helvetica", 10)
+        p.drawString(1*inch, 1*inch, "ToVector.ai - Making vectorization simple")
+        p.drawString(1*inch, 0.75*inch, "Contact: support@tovector.ai")
+        
+        # Draw horizontal lines
+        p.setStrokeColor(colors.black)
+        p.line(1*inch, 7.7*inch, 7.5*inch, 7.7*inch)  # Below "BILLING INFORMATION"
+        p.line(1*inch, 5.2*inch, 7.5*inch, 5.2*inch)  # Below "TRANSACTION DETAILS"
+        
+        # Close the PDF object cleanly
+        p.showPage()
+        p.save()
+        
+        # Get the value of the BytesIO buffer and write it to the response
+        pdf = buffer.getvalue()
+        buffer.close()
+        
+        # Create the HTTP response with PDF content
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="invoice_{transaction.invoice_number}.pdf"'
+        response.write(pdf)
+        
         return response
         
     except Transaction.DoesNotExist:
