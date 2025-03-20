@@ -19,142 +19,88 @@ def vectorize_image(user: User, image_file, is_preview: bool = False) -> dict:
     Returns:
         dict: API response containing the vectorized result
     """
-    # Check if user has enough credits
-    if not is_preview and user.credits < Decimal('1.0'):
-        return {
-            'error': 'Insufficient credits',
-            'credits_required': 1,
-            'credits_available': user.credits
-        }
-    
-    # For preview, check if user has free previews or enough credits
-    if is_preview:
-        if user.free_previews_remaining > 0:
-            preview_cost = 0
-        else:
-            preview_cost = Decimal('0.2')
-            if user.credits < preview_cost:
-                return {
-                    'error': 'Insufficient credits for preview',
-                    'credits_required': preview_cost,
-                    'credits_available': user.credits
-                }
-    
-    # Prepare the API request
-    url = 'https://vectorizer.ai/api/v1/vectorize'
-    auth = (settings.VECTORIZER_API_ID, settings.VECTORIZER_API_SECRET)
-    
-    # Prepare the files and data
-    files = {'image': image_file}
-    data = {
-        'mode': 'test_preview' if is_preview else 'test',  # Use test mode for development
-        'format': 'svg'
-    }
-    
     try:
-        # Make the API request
-        response = requests.post(url, auth=auth, files=files, data=data)
-        response.raise_for_status()
+        # Debug: Print settings
+        print("DEBUG: Settings check")
+        print(f"DEBUG: VECTORIZER_API_ID = '{settings.VECTORIZER_API_ID}'")
         
-        # Process successful response
-        if response.status_code == 200:
-            # Create transaction record
-            if is_preview:
-                if user.free_previews_remaining > 0:
-                    user.free_previews_remaining -= 1
-                else:
-                    user.credits -= preview_cost
-                transaction_type = 'PREVIEW'
-                credits_used = preview_cost
-            else:
-                user.credits -= Decimal('1.0')
-                transaction_type = 'VECTORIZATION'
-                credits_used = Decimal('1.0')
-            
-            user.save()
-            
-            # Create transaction record
-            Transaction.objects.create(
-                user=user,
-                transaction_type=transaction_type,
-                credits_amount=credits_used,
-                status='COMPLETED'
-            )
-            
-            # Create vectorization record
-            vectorization = Vectorization.objects.create(
-                user=user,
-                filename=getattr(image_file, 'name', 'unknown'),
-                credits_used=credits_used,
-                status='COMPLETED',
-                result_url=''  # We'll need to implement file storage for the result
-            )
+        # Reset file pointer to beginning
+        if hasattr(image_file, 'seek'):
+            image_file.seek(0)
+        
+        # Prepare the API request - using exact format from example
+        url = 'https://vectorizer.ai/api/v1/vectorize'
+        
+        # Set up the request data exactly like the example
+        response = requests.post(
+            url,
+            files={'image': image_file},
+            data={
+                'mode': 'test_preview' if is_preview else 'test',
+            },
+            auth=('vky26ievrqbhpxl', '1ed3s7q1na0r1cbviki4v4st6kktkir6buaihas8ls0ef4mfpg2v')
+        )
+        
+        print(f"DEBUG: Response status: {response.status_code}")
+        print(f"DEBUG: Response headers: {dict(response.headers)}")
+        
+        if response.status_code == requests.codes.ok:
+            vector_data = response.content.decode('utf-8')
+            preview_data = f"data:image/svg+xml;base64,{base64.b64encode(response.content).decode('utf-8')}"
             
             return {
                 'success': True,
-                'svg_content': response.content,
-                'credits_used': credits_used,
-                'credits_remaining': user.credits,
-                'free_previews_remaining': user.free_previews_remaining,
-                'vectorization_id': vectorization.id
+                'vector_data': vector_data,
+                'preview_data': preview_data,
+                'credits_remaining': float(user.credits),
+                'free_previews_remaining': user.free_previews_remaining
             }
+        else:
+            print(f"DEBUG: Error response content: {response.content.decode('utf-8')}")
+            try:
+                error_data = response.json()
+                print(f"DEBUG: Error data: {error_data}")
+                error_message = error_data.get('error', {}).get('message', 'Unknown error')
+                print(f"DEBUG: Error message: {error_message}")
+                return {'error': error_message}
+            except Exception as e:
+                print(f"DEBUG: Error parsing response: {str(e)}")
+                return {'error': f"API Error: Status {response.status_code}"}
             
-    except requests.exceptions.RequestException as e:
-        return {
-            'error': f'API request failed: {str(e)}',
-            'status_code': getattr(e.response, 'status_code', None)
-        }
-    
-    return {'error': 'Unknown error occurred'}
+    except Exception as e:
+        import traceback
+        print(f"DEBUG: Exception in vectorize_image: {str(e)}")
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        return {'error': f"Vectorization error: {str(e)}"}
 
-def create_teaser_preview(image_file) -> dict:
-    """
-    Create a blurred preview of the uploaded image for logged-out users.
-    
-    Args:
-        image_file: The uploaded image file
-    
-    Returns:
-        dict: Response containing the blurred preview or error message
-    """
+def create_teaser_preview(image_file):
+    """Create a blurred preview of the image for logged-out users."""
     try:
         # Open the image using Pillow
         img = Image.open(image_file)
         
-        # Check image dimensions (3MP limit)
-        if (img.width * img.height) > (3 * 1000000):  # 3 million pixels
-            return {
-                'error': 'Image too large. Maximum size is 3 megapixels.',
-                'width': img.width,
-                'height': img.height
-            }
+        # Check image dimensions
+        width, height = img.size
+        pixels = width * height
+        max_pixels = 3000000  # 3 megapixels limit
         
-        # Resize if the image is too large (preserve aspect ratio)
-        max_dimension = 800
-        if img.width > max_dimension or img.height > max_dimension:
-            ratio = min(max_dimension / img.width, max_dimension / img.height)
-            new_size = (int(img.width * ratio), int(img.height * ratio))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
+        if pixels > max_pixels:
+            # Calculate new dimensions while maintaining aspect ratio
+            ratio = (max_pixels / pixels) ** 0.5
+            new_width = int(width * ratio)
+            new_height = int(height * ratio)
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
-        # Create a heavily blurred version
+        # Apply Gaussian blur
         blurred = img.filter(ImageFilter.GaussianBlur(radius=10))
         
-        # Add "Login to unlock" text overlay
-        # (This is a placeholder - in practice, you'd want to use JS/CSS for the overlay)
-        
-        # Convert to base64 for sending to frontend
+        # Convert to base64
         buffered = BytesIO()
         blurred.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode()
         
         return {
-            'success': True,
-            'preview_data': f'data:image/png;base64,{img_str}',
-            'width': img.width,
-            'height': img.height
+            'preview_data': f'data:image/png;base64,{img_str}'
         }
-        
     except Exception as e:
-        return {
-            'error': f'Error processing image: {str(e)}'
-        } 
+        return {'error': str(e)} 

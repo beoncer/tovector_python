@@ -708,6 +708,7 @@ def download_invoice(request, transaction_id):
             'error': 'Invoice not found'
         })
 
+@csrf_exempt
 @require_http_methods(['POST'])
 def vectorize(request):
     """Process the image and return vectorization results."""
@@ -730,14 +731,6 @@ def vectorize(request):
                 print(f"Traceback: {traceback.format_exc()}")
                 return JsonResponse({'error': 'Error accessing uploaded file'}, status=500)
         
-        # Validate file type
-        if not image.content_type.startswith('image/'):
-            return JsonResponse({'error': 'Invalid file type. Please upload an image.'}, status=400)
-        
-        # Validate file size (30MB limit)
-        if image.size > 30 * 1024 * 1024:
-            return JsonResponse({'error': 'File size exceeds 30MB limit.'}, status=400)
-        
         # Check if user is authenticated
         if not request.user.is_authenticated:
             return JsonResponse({
@@ -747,67 +740,22 @@ def vectorize(request):
                 'signup_url': reverse('core:signup')
             }, status=401)
         
-        # Check credits based on action
+        # Process the image
         action = request.POST.get('action', 'vectorize')
-        cost = 0.2 if action == 'preview' else 1.0
+        result = vectorize_image(request.user, image, is_preview=(action == 'preview'))
         
-        if request.user.free_previews_remaining > 0 and action == 'preview':
-            cost = 0
-        elif float(request.user.credits) < cost:
-            return JsonResponse({
-                'error': 'Insufficient credits',
-                'required_credits': cost,
-                'current_credits': float(request.user.credits)
-            }, status=402)
+        if 'error' in result:
+            return JsonResponse({'error': result['error']}, status=400)
         
-        try:
-            # Process the image
-            result = vectorize_image(image)
-            if 'error' in result:
-                return JsonResponse({'error': result['error']}, status=400)
-            
-            # Create transaction record
-            Transaction.objects.create(
-                user=request.user,
-                amount=cost,
-                transaction_type='preview' if action == 'preview' else 'vectorize'
-            )
-            
-            # Update user credits and free previews
-            request.user.credits -= cost
-            if action == 'preview' and request.user.free_previews_remaining > 0:
-                request.user.free_previews_remaining -= 1
-            request.user.save()
-            
-            # Create vectorization record
-            Vectorization.objects.create(
-                user=request.user,
-                original_image=image.name,
-                vector_data=result['vector_data'],
-                preview_data=result['preview_data'],
-                cost=cost
-            )
-            
-            # Clean up temporary file if it exists
-            if 'temp_file_path' in request.POST:
-                try:
-                    default_storage.delete(request.POST['temp_file_path'])
-                except Exception as e:
-                    print(f"Error deleting temporary file: {str(e)}")
-                    # Don't fail the request if cleanup fails
-            
-            return JsonResponse({
-                'success': True,
-                'vector_data': result['vector_data'],
-                'preview_data': result['preview_data'],
-                'credits_balance': float(request.user.credits),
-                'free_previews': request.user.free_previews_remaining
-            })
-            
-        except Exception as e:
-            print(f"Error processing image: {str(e)}")
-            print(f"Traceback: {traceback.format_exc()}")
-            return JsonResponse({'error': 'Error processing image'}, status=500)
+        # Clean up temporary file if it exists
+        if 'temp_file_path' in request.POST:
+            try:
+                default_storage.delete(request.POST['temp_file_path'])
+            except Exception as e:
+                print(f"Error deleting temporary file: {str(e)}")
+                # Don't fail the request if cleanup fails
+        
+        return JsonResponse(result)
             
     except Exception as e:
         print(f"Unexpected error in vectorize view: {str(e)}")
