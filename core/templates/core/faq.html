@@ -1,0 +1,189 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}FAQ - ToVector.ai{% endblock %}
+
+{% block content %}
+<div class="faq-container">
+    <div class="faq-header">
+        <h1>Frequently Asked Questions</h1>
+        <p>Find answers to common questions about ToVector.ai</p>
+    </div>
+
+    <div class="faq-sections">
+        <div class="faq-section">
+            <h2>General Questions</h2>
+            <div class="faq-items">
+                <div class="faq-item">
+                    <h3>What is ToVector.ai?</h3>
+                    <p>ToVector.ai is a powerful SaaS platform that converts your images into high-quality vector graphics using advanced AI technology.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>How accurate is the vectorization?</h3>
+                    <p>Our AI-powered vectorization provides highly accurate results, especially for logos, icons, and illustrations. You can preview the results before using your credits.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>What file formats do you support?</h3>
+                    <p>We support input formats including PNG, JPG, JPEG, and BMP. Vector outputs are available in SVG, AI, and EPS formats.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-section">
+            <h2>Credits & Pricing</h2>
+            <div class="faq-items">
+                <div class="faq-item">
+                    <h3>How do credits work?</h3>
+                    <p>Credits are used to vectorize images. One credit typically converts one image, with preview options available before using credits.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Do credits expire?</h3>
+                    <p>No, your credits never expire. You can use them whenever you need them.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Can I get a refund?</h3>
+                    <p>Yes, unused credits can be refunded within 30 days of purchase. Contact our support team for assistance.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-section">
+            <h2>Technical Questions</h2>
+            <div class="faq-items">
+                <div class="faq-item">
+                    <h3>What's the maximum file size?</h3>
+                    <p>We accept images up to 50MB in size. For larger files, please contact our support team.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>How long does vectorization take?</h3>
+                    <p>Most images are processed within seconds. Complex images may take up to a minute.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Can I batch process images?</h3>
+                    <p>Yes, you can upload and process multiple images at once. Each image will use one credit.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="contact-support">
+        <h2>Still have questions?</h2>
+        <p>Our support team is here to help</p>
+        <a href="{% url 'core:support' %}" class="support-button">Contact Support</a>
+    </div>
+</div>
+
+<style>
+.faq-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+}
+
+.faq-header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.faq-header h1 {
+    font-size: 2.5rem;
+    color: #000000;
+    margin-bottom: 1rem;
+}
+
+.faq-header p {
+    font-size: 1.2rem;
+    color: #666;
+}
+
+.faq-sections {
+    display: grid;
+    gap: 3rem;
+}
+
+.faq-section {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.faq-section h2 {
+    color: #FF0000;
+    font-size: 1.8rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.faq-items {
+    display: grid;
+    gap: 2rem;
+}
+
+.faq-item {
+    padding: 1rem 0;
+}
+
+.faq-item h3 {
+    color: #000000;
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.faq-item p {
+    color: #666;
+    line-height: 1.6;
+}
+
+.contact-support {
+    text-align: center;
+    margin-top: 4rem;
+    padding: 3rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.contact-support h2 {
+    color: #000000;
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+.contact-support p {
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.support-button {
+    display: inline-block;
+    padding: 1rem 2rem;
+    background: #FF0000;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.support-button:hover {
+    background: #cc0000;
+}
+
+@media (max-width: 768px) {
+    .faq-container {
+        padding: 2rem 1rem;
+    }
+    
+    .faq-header h1 {
+        font-size: 2rem;
+    }
+    
+    .faq-section h2 {
+        font-size: 1.5rem;
+    }
+}
+</style>
+{% endblock %} 

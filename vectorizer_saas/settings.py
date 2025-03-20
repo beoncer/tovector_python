@@ -56,6 +56,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'core.middleware.Auth0Middleware',  # Add Auth0 middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -153,7 +154,7 @@ AUTH_USER_MODEL = 'core.User'
 AUTH0_DOMAIN = config('AUTH0_DOMAIN')
 AUTH0_CLIENT_ID = config('AUTH0_CLIENT_ID')
 AUTH0_CLIENT_SECRET = config('AUTH0_CLIENT_SECRET')
-AUTH0_CALLBACK_URL = config('AUTH0_CALLBACK_URL')
+AUTH0_CALLBACK_URL = 'https://14de-2001-7d0-8224-e00-c85a-f6d7-4e2b-efde.ngrok-free.app/callback/'
 
 # Print Auth0 settings for debugging
 print("\nAuth0 Settings:")
@@ -165,20 +166,18 @@ print(f"Callback URL: {AUTH0_CALLBACK_URL}")
 INITIAL_FREE_CREDITS = config('INITIAL_FREE_CREDITS', default=10, cast=int)
 
 # Auth0 Social Connections
-AUTH0_SOCIAL_CONNECTIONS = {
-    'google-oauth2': {
-        'name': 'Google',
-        'icon': 'google',
+AUTH0_SOCIAL_CONNECTIONS = [
+    {
+        'name': 'google-oauth2',
+        'label': 'Google',
+        'icon': 'google-icon.svg'
     },
-    'facebook': {
-        'name': 'Facebook',
-        'icon': 'facebook',
-    },
-    'email': {
-        'name': 'Email',
-        'icon': 'email',
+    {
+        'name': 'facebook',
+        'label': 'Facebook',
+        'icon': 'facebook-icon.svg'
     }
-}
+]
 
 # Stripe settings
 STRIPE_PUBLIC_KEY = config('STRIPE_PUBLIC_KEY')
@@ -188,3 +187,10 @@ STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET')
 # Vectorizer.ai settings
 VECTORIZER_API_ID = config('VECTORIZER_API_ID')
 VECTORIZER_API_SECRET = config('VECTORIZER_API_SECRET')
+
+# Session settings
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_SECURE = True  # Only send over HTTPS
+SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access
+SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Session ends when browser closes

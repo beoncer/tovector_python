@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from decimal import Decimal
+from django.utils import timezone
 
 class User(AbstractUser):
     company_name = models.CharField(_('Company Name'), max_length=255, blank=True)
@@ -91,3 +92,47 @@ class Transaction(models.Model):
             self.invoice_number = f'INV-{date_str}-{new_number:04d}'
         
         super().save(*args, **kwargs)
+
+class Vectorization(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vectorizations')
+    filename = models.CharField(_('Filename'), max_length=255)
+    credits_used = models.DecimalField(_('Credits Used'), max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(_('Created At'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('Updated At'), auto_now=True)
+    expires_at = models.DateTimeField(_('Expires At'), null=True)
+    storage_path = models.CharField(_('Storage Path'), max_length=255, blank=True)
+    status = models.CharField(
+        _('Status'),
+        max_length=20,
+        choices=[
+            ('PENDING', _('Pending')),
+            ('COMPLETED', _('Completed')),
+            ('FAILED', _('Failed')),
+            ('EXPIRED', _('Expired')),
+        ],
+        default='PENDING'
+    )
+    result_url = models.URLField(_('Result URL'), blank=True)
+
+    class Meta:
+        verbose_name = _('Vectorization')
+        verbose_name_plural = _('Vectorizations')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.filename} - {self.created_at}"
+
+    @property
+    def time_remaining(self):
+        """Return time remaining before expiration in seconds"""
+        if not self.expires_at:
+            return 0
+        from django.utils import timezone
+        now = timezone.now()
+        if now > self.expires_at:
+            return 0
+        return int((self.expires_at - now).total_seconds())
+
+    def is_expired(self):
+        """Check if the vectorization result has expired"""
+        return self.time_remaining <= 0

@@ -1,0 +1,132 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Payment Successful - ToVector.ai{% endblock %}
+
+{% block content %}
+<div class="checkout-result">
+    <div class="success-icon">✓</div>
+    <h1>Payment Successful!</h1>
+    
+    {% if status == 'pending' %}
+        <div class="transaction-info">
+            <p>Your payment has been received and is being processed.</p>
+            <p>Transaction ID: {{ transaction.id }}</p>
+            <p>Status: {{ transaction.status }}</p>
+            <p>Please wait a moment while we update your credits...</p>
+        </div>
+    {% elif status == 'no_transaction' %}
+        <div class="transaction-info">
+            <p>We're having trouble finding your transaction.</p>
+            <p>Please contact support if this issue persists.</p>
+        </div>
+    {% else %}
+        <div class="transaction-info">
+            <p>Your credits have been successfully added to your account!</p>
+            <div class="credit-update">
+                <p>Credits Added: <strong>{{ credits_added }}</strong></p>
+                <p>New Balance: <strong>{{ new_balance }}</strong></p>
+            </div>
+            <div class="transaction-details">
+                <p>Transaction ID: {{ transaction.id }}</p>
+                <p>Credit Pack: {{ credit_pack.name }}</p>
+                <p>Amount Paid: ${{ transaction.amount_paid }}</p>
+            </div>
+        </div>
+    {% endif %}
+    
+    <div class="action-buttons">
+        <a href="{% url 'core:dashboard' %}" class="primary-button">Go to Dashboard</a>
+        <a href="{% url 'core:home' %}" class="secondary-button">Start Vectorizing</a>
+    </div>
+</div>
+
+<style>
+.checkout-result {
+    max-width: 600px;
+    margin: 4rem auto;
+    text-align: center;
+    padding: 2rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.success-icon {
+    font-size: 4rem;
+    color: #00C853;
+    margin-bottom: 1rem;
+}
+
+h1 {
+    color: #000000;
+    margin-bottom: 1rem;
+}
+
+.transaction-info {
+    margin: 2rem 0;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.credit-update {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: #e8f5e9;
+    border-radius: 4px;
+}
+
+.credit-update p {
+    margin: 0.5rem 0;
+    font-size: 1.1rem;
+}
+
+.transaction-details {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #dee2e6;
+}
+
+.transaction-details p {
+    margin: 0.5rem 0;
+    color: #666;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.primary-button {
+    background: #FF0000;
+    color: #FFFFFF;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.primary-button:hover {
+    background: #cc0000;
+}
+
+.secondary-button {
+    background: #FFFFFF;
+    color: #000000;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    border: 2px solid #000000;
+    transition: all 0.2s;
+}
+
+.secondary-button:hover {
+    background: #000000;
+    color: #FFFFFF;
+}
+</style>
+{% endblock %} 
