@@ -8,8 +8,16 @@
     <div class="dashboard-header">
         <h1>Welcome, {{ request.user.first_name|default:request.user.email }}</h1>
         <div class="credits-display">
-            <span class="credits-label">Available Credits:</span>
-            <span class="credits-amount">{{ request.user.credits }}</span>
+            <div class="credits-info">
+                <div class="credits-row">
+                    <span class="credits-label">Available Credits:</span>
+                    <span class="credits-amount">{{ request.user.credits }}</span>
+                </div>
+                <div class="credits-row">
+                    <span class="credits-label">Free Previews Left:</span>
+                    <span class="credits-amount">{{ request.user.free_previews_remaining }}</span>
+                </div>
+            </div>
             <a href="{% url 'core:pricing' %}" class="buy-credits-button">Buy More Credits</a>
         </div>
     </div>
@@ -175,6 +183,18 @@
     border-radius: 8px;
 }
 
+.credits-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.credits-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
 .credits-label {
     font-size: 1rem;
     color: #666;
@@ -182,10 +202,14 @@
 }
 
 .credits-amount {
-    font-size: 1.8rem;
+    font-size: 1.2rem;
     font-weight: bold;
     color: #000000;
     white-space: nowrap;
+}
+
+.credits-row:first-child .credits-amount {
+    font-size: 1.8rem;
 }
 
 .buy-credits-button {
