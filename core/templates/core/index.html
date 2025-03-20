@@ -1,150 +1,583 @@
 {% extends 'core/base.html' %}
+{% load static %}
 
-{% block title %}ToVector.ai - Convert Images to Vector Graphics{% endblock %}
+{% block title %}ToVector.ai - Vectorize Your Images{% endblock %}
 
 {% block content %}
-<div class="hero-section">
-    <h1>Convert Images to Vector Graphics</h1>
-    <p class="hero-text">Transform your images into high-quality vector graphics with AI</p>
-    
-    <div class="upload-container" id="upload-container">
-        <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.bmp,.tiff" style="display: none;">
-        <div class="upload-content">
-            <p class="upload-text">Drag and drop an image here, or click to select</p>
-            <p class="supported-formats">Supported formats: PNG, JPG, BMP, TIFF (max 25MB)</p>
+<div class="main-container">
+    <div class="upload-section">
+        <h1>Transform Your Images into Vector Art</h1>
+        <p class="subtitle">Upload your image and we'll convert it to a scalable vector graphic</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <form id="uploadForm" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="file" id="imageInput" name="image" accept="image/*" style="display: none;">
+                <div class="upload-box" id="dropZone">
+                    <div class="upload-content">
+                        <img src="{% static 'core/images/upload-icon.svg' %}" alt="Upload" class="upload-icon">
+                        <p>Drag and drop your image here<br>or <span class="browse-text">browse</span></p>
+                        <p class="file-limits">Maximum file size: 30MB</p>
+                    </div>
+                </div>
+            </form>
         </div>
-    </div>
-
-    <div class="features-grid">
-        <div class="feature">
-            <h3>High Quality</h3>
-            <p>Get crisp, clean vectors with our advanced AI algorithms</p>
-        </div>
-        <div class="feature">
-            <h3>Multiple Formats</h3>
-            <p>Export as SVG, PDF, or EPS - use them anywhere</p>
-        </div>
-        <div class="feature">
-            <h3>Preview First</h3>
-            <p>See the result before using your credits</p>
+        
+        <div id="previewContainer" style="display: none;">
+            <div class="preview-header">
+                <h3>Preview</h3>
+                <button id="resetButton" class="reset-button">Upload Another</button>
+            </div>
+            <div class="preview-content">
+                <div id="previewImage" class="preview-image"></div>
+                <div id="processingOverlay" class="processing-overlay" style="display: none;">
+                    <div class="processing-content">
+                        <div class="spinner"></div>
+                        <p id="processingText">Analyzing image...</p>
+                    </div>
+                </div>
+                <div id="loginPrompt" class="login-prompt" style="display: none;">
+                    <h3>Ready to Vectorize?</h3>
+                    <p>Sign up and buy credits to unlock your vector image!</p>
+                    <div class="cta-buttons">
+                        <a href="" id="loginButton" class="cta-button login">Log In</a>
+                        <a href="" id="signupButton" class="cta-button signup">Sign Up</a>
+                    </div>
+                </div>
+                <div id="actionButtons" class="action-buttons" style="display: none;">
+                    <div class="button-group">
+                        <button id="previewButton" class="btn btn-light" disabled>
+                            Preview
+                            <span id="previewCost"></span>
+                        </button>
+                        <button id="vectorizeButton" class="btn btn-primary" disabled>
+                            Vectorize
+                            <span id="vectorizeCost">1 Credit</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="resultContainer" class="result-container" style="display: none;">
+                    <div class="result-header">
+                        <h3>Result</h3>
+                        <button id="downloadButton" class="download-button">Download SVG</button>
+                    </div>
+                    <div id="resultContent" class="result-content"></div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
+<style>
+.main-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.upload-section {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: #000000;
+}
+
+.subtitle {
+    font-size: 1.2rem;
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.upload-area {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.upload-box {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.upload-box:hover {
+    border-color: #FF0000;
+}
+
+.upload-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.upload-icon {
+    width: 64px;
+    height: 64px;
+}
+
+.browse-text {
+    color: #FF0000;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.file-limits {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.reset-button {
+    background: #000000;
+    color: #FFFFFF;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.reset-button:hover {
+    background: #333333;
+}
+
+.preview-content {
+    position: relative;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.preview-image {
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.preview-image img {
+    width: 100%;
+    height: auto;
+}
+
+.processing-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+.processing-content {
+    text-align: center;
+    color: #FFFFFF;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #FFFFFF;
+    border-top: 4px solid #FF0000;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.login-prompt {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    color: #FFFFFF;
+    padding: 2rem;
+}
+
+.login-prompt h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.cta-button {
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.cta-button.login {
+    background: #FFFFFF;
+    color: #000000;
+}
+
+.cta-button.signup {
+    background: #FF0000;
+    color: #FFFFFF;
+}
+
+.cta-button:hover {
+    transform: translateY(-2px);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.action-buttons button {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    min-width: 120px;
+}
+
+#previewCost, #vectorizeCost {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    white-space: nowrap;
+}
+
+.button-group {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.action-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 150px;
+}
+
+.action-button.preview {
+    background: #f5f5f5;
+    color: #000000;
+}
+
+.action-button.vectorize {
+    background: #FF0000;
+    color: #FFFFFF;
+}
+
+.action-button:hover {
+    transform: translateY(-2px);
+}
+
+.button-cost {
+    font-size: 0.9rem;
+    margin-top: 0.25rem;
+}
+
+.result-container {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.download-button {
+    background: #000000;
+    color: #FFFFFF;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.download-button:hover {
+    background: #333333;
+}
+
+.result-content {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 1rem;
+    background: #f5f5f5;
+    border-radius: 8px;
+}
+
+.result-content svg {
+    max-width: 100%;
+    height: auto;
+}
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const uploadContainer = document.getElementById('upload-container');
-    const fileInput = document.getElementById('file-input');
-
-    uploadContainer.addEventListener('click', function() {
-        fileInput.click();
-    });
-
+    const uploadForm = document.getElementById('uploadForm');
+    const imageInput = document.getElementById('imageInput');
+    const dropZone = document.getElementById('dropZone');
+    const uploadArea = document.getElementById('uploadArea');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewImage = document.getElementById('previewImage');
+    const processingOverlay = document.getElementById('processingOverlay');
+    const processingText = document.getElementById('processingText');
+    const loginPrompt = document.getElementById('loginPrompt');
+    const actionButtons = document.getElementById('actionButtons');
+    const resultContainer = document.getElementById('resultContainer');
+    const resultContent = document.getElementById('resultContent');
+    const previewButton = document.getElementById('previewButton');
+    const vectorizeButton = document.getElementById('vectorizeButton');
+    const downloadButton = document.getElementById('downloadButton');
+    const resetButton = document.getElementById('resetButton');
+    const loginButton = document.getElementById('loginButton');
+    const signupButton = document.getElementById('signupButton');
+    
+    let currentFile = null;
+    let currentPreviewCost = 0;
+    let currentTempPath = null;
+    
+    // Set up drag and drop
+    dropZone.addEventListener('click', () => imageInput.click());
+    
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        uploadContainer.addEventListener(eventName, preventDefaults, false);
+        dropZone.addEventListener(eventName, preventDefaults, false);
     });
-
+    
     function preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
     }
-
+    
     ['dragenter', 'dragover'].forEach(eventName => {
-        uploadContainer.addEventListener(eventName, highlight, false);
+        dropZone.addEventListener(eventName, highlight, false);
     });
-
+    
     ['dragleave', 'drop'].forEach(eventName => {
-        uploadContainer.addEventListener(eventName, unhighlight, false);
+        dropZone.addEventListener(eventName, unhighlight, false);
     });
-
+    
     function highlight(e) {
-        uploadContainer.classList.add('highlight');
+        dropZone.classList.add('highlight');
     }
-
+    
     function unhighlight(e) {
-        uploadContainer.classList.remove('highlight');
+        dropZone.classList.remove('highlight');
     }
-
-    uploadContainer.addEventListener('drop', handleDrop, false);
-
+    
+    dropZone.addEventListener('drop', handleDrop, false);
+    
     function handleDrop(e) {
         const dt = e.dataTransfer;
         const files = dt.files;
         handleFiles(files);
     }
-
-    fileInput.addEventListener('change', function(e) {
+    
+    imageInput.addEventListener('change', function(e) {
         handleFiles(this.files);
     });
-
+    
     function handleFiles(files) {
-        if (files.length > 0) {
-            const file = files[0];
-            if (validateFile(file)) {
-                uploadFile(file);
-            }
+        if (files.length === 0) return;
+        
+        const file = files[0];
+        if (!file.type.startsWith('image/')) {
+            alert('Please upload an image file');
+            return;
         }
+        
+        currentFile = file;
+        currentTempPath = null;
+        
+        // Show processing state
+        uploadArea.style.display = 'none';
+        previewContainer.style.display = 'block';
+        processingOverlay.style.display = 'flex';
+        loginPrompt.style.display = 'none';
+        actionButtons.style.display = 'none';
+        resultContainer.style.display = 'none';
+        
+        // Create form data
+        const formData = new FormData(uploadForm);
+        formData.set('image', file);
+        
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImage.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+        }
+        reader.readAsDataURL(file);
+        
+        // Simulate processing delay
+        setTimeout(() => {
+            // Send to server
+            fetch('/upload/', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                processingOverlay.style.display = 'none';
+                
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                if (data.requires_login) {
+                    // Update preview with blurred image
+                    previewImage.innerHTML = `<img src="${data.preview_data}" alt="Preview">`;
+                    // Show login prompt
+                    loginPrompt.style.display = 'flex';
+                    // Update login/signup URLs
+                    loginButton.href = data.login_url;
+                    signupButton.href = data.signup_url;
+                } else {
+                    // Show action buttons for logged-in users
+                    actionButtons.style.display = 'block';
+                    currentPreviewCost = data.preview_cost;
+                    currentTempPath = data.temp_file_path;
+                    updateActionButtons(data);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while processing your image');
+            });
+        }, 2000); // 2 second delay for processing animation
     }
-
-    function validateFile(file) {
-        const validTypes = ['image/png', 'image/jpeg', 'image/bmp', 'image/tiff'];
-        const maxSize = 25 * 1024 * 1024; // 25MB
-
-        if (!validTypes.includes(file.type)) {
-            alert('Please upload a valid image file (PNG, JPG, BMP, or TIFF)');
-            return false;
+    
+    function updateActionButtons(data) {
+        const previewButton = document.getElementById('previewButton');
+        const vectorizeButton = document.getElementById('vectorizeButton');
+        const previewCostSpan = document.getElementById('previewCost');
+        
+        if (data.requires_login) {
+            previewButton.disabled = false;
+            vectorizeButton.disabled = false;
+            previewButton.onclick = () => redirectToLogin();
+            vectorizeButton.onclick = () => redirectToLogin();
+            return;
         }
-
-        if (file.size > maxSize) {
-            alert('File size must be less than 25MB');
-            return false;
+        
+        // Update preview button text and cost
+        previewButton.disabled = false;
+        if (data.free_previews > 0) {
+            previewCostSpan.textContent = ` (${data.free_previews} free previews left)`;
+        } else {
+            previewCostSpan.textContent = ' (0.2 Credits)';
         }
-
-        return true;
+        
+        // Update vectorize button
+        vectorizeButton.disabled = false;
+        
+        currentPreviewCost = data.preview_cost;
+        
+        previewButton.onclick = () => processImage('preview');
+        vectorizeButton.onclick = () => processImage('vectorize');
     }
-
-    function uploadFile(file) {
+    
+    function processImage(action) {
+        if (!currentFile) return;
+        
+        processingOverlay.style.display = 'flex';
+        processingText.textContent = 'Processing image...';
+        
         const formData = new FormData();
-        formData.append('image', file);
-
-        fetch('{% url "core:upload" %}', {
+        formData.append('action', action);
+        formData.append('temp_file_path', currentTempPath);
+        
+        fetch('/vectorize/', {
             method: 'POST',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: formData
+            body: formData,
+            credentials: 'same-origin'
         })
         .then(response => response.json())
         .then(data => {
+            processingOverlay.style.display = 'none';
+            
             if (data.error) {
                 alert(data.error);
-            } else {
-                // Handle successful upload
-                console.log('Upload successful:', data);
+                return;
             }
+            
+            resultContent.innerHTML = data.svg_content;
+            resultContainer.style.display = 'block';
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while uploading the file');
+            alert('An error occurred while processing your image');
         });
     }
-
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
+    
+    function redirectToLogin() {
+        // Implement redirect to login page
+        alert('Redirecting to login page');
     }
+    
+    downloadButton.addEventListener('click', function() {
+        const svgContent = resultContent.innerHTML;
+        if (!svgContent) return;
+        
+        const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'vectorized.svg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+    
+    resetButton.addEventListener('click', function() {
+        uploadForm.reset();
+        uploadArea.style.display = 'block';
+        previewContainer.style.display = 'none';
+        processingOverlay.style.display = 'none';
+        loginPrompt.style.display = 'none';
+        actionButtons.style.display = 'none';
+        resultContainer.style.display = 'none';
+        previewImage.innerHTML = '';
+        resultContent.innerHTML = '';
+        currentFile = null;
+    });
 });
 </script>
 {% endblock %} 

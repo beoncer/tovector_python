@@ -23,6 +23,12 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 from io import BytesIO
+from .utils import create_teaser_preview, vectorize_image
+import traceback
+import os
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+import uuid
 
 def home(request):
     """Homepage view."""
@@ -328,15 +334,98 @@ class Auth0CallbackView(View):
                 'error': 'An unexpected error occurred during authentication'
             })
 
-@method_decorator(require_http_methods(['POST']), name='dispatch')
-class UploadImageView(View):
-    """Handle image uploads."""
-    def post(self, request):
+@require_http_methods(['POST'])
+def upload(request):
+    """Handle initial file upload and return preview cost information."""
+    try:
+        if 'image' not in request.FILES:
+            return JsonResponse({'error': 'No image file provided'}, status=400)
+        
+        image = request.FILES['image']
+        
+        # Validate file type
+        if not image.content_type.startswith('image/'):
+            return JsonResponse({'error': 'Invalid file type. Please upload an image.'}, status=400)
+        
+        # Validate file size (30MB limit)
+        if image.size > 30 * 1024 * 1024:
+            return JsonResponse({'error': 'File size exceeds 30MB limit.'}, status=400)
+        
+        # For logged-out users, return teaser preview
         if not request.user.is_authenticated:
-            return JsonResponse({'error': 'Authentication required'}, status=401)
+            try:
+                preview_result = create_teaser_preview(image)
+                if 'error' in preview_result:
+                    return JsonResponse({'error': preview_result['error']}, status=400)
+                
+                return JsonResponse({
+                    'success': True,
+                    'preview_data': preview_result['preview_data'],
+                    'requires_login': True,
+                    'login_url': reverse('core:login'),
+                    'signup_url': reverse('core:signup')
+                })
+            except Exception as e:
+                print(f"Error creating teaser preview: {str(e)}")
+                print(f"Traceback: {traceback.format_exc()}")
+                return JsonResponse({'error': 'Error processing image'}, status=500)
+        
+        # For logged-in users, store the image temporarily and return preview cost information
+        try:
+            # Ensure the temp directory exists
+            temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
+            os.makedirs(temp_dir, exist_ok=True)
             
-        # TODO: Implement image upload and vectorization
-        return JsonResponse({'message': 'Upload endpoint'})
+            # Generate a unique filename
+            ext = os.path.splitext(image.name)[1]
+            temp_filename = f"temp/{uuid.uuid4()}{ext}"
+            
+            # Save the file temporarily
+            try:
+                path = default_storage.save(temp_filename, ContentFile(image.read()))
+                print(f"Saved temporary file to: {path}")
+            except Exception as e:
+                print(f"Error saving temporary file: {str(e)}")
+                print(f"Traceback: {traceback.format_exc()}")
+                return JsonResponse({'error': 'Error saving uploaded file'}, status=500)
+            
+            # Calculate preview cost
+            preview_cost = 0 if request.user.free_previews_remaining > 0 else 0.2
+            
+            # Create a temporary preview
+            try:
+                # Reset file pointer before creating preview
+                image.seek(0)
+                preview_result = create_teaser_preview(image)
+                if 'error' in preview_result:
+                    # Clean up the temporary file
+                    default_storage.delete(path)
+                    return JsonResponse({'error': preview_result['error']}, status=400)
+            except Exception as e:
+                print(f"Error creating preview: {str(e)}")
+                print(f"Traceback: {traceback.format_exc()}")
+                # Clean up the temporary file
+                default_storage.delete(path)
+                return JsonResponse({'error': 'Error creating preview'}, status=500)
+            
+            return JsonResponse({
+                'success': True,
+                'preview_data': preview_result['preview_data'],
+                'requires_login': False,
+                'preview_cost': preview_cost,
+                'credits_balance': float(request.user.credits),
+                'free_previews': request.user.free_previews_remaining,
+                'temp_file_path': path  # Store the path for later use
+            })
+        except Exception as e:
+            print(f"Error processing image for logged-in user: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            return JsonResponse({'error': 'Error processing image'}, status=500)
+            
+    except Exception as e:
+        print(f"Unexpected error in upload view: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return JsonResponse({'error': 'An unexpected error occurred'}, status=500)
 
 @csrf_exempt
 @require_POST
@@ -618,3 +707,109 @@ def download_invoice(request, transaction_id):
         return render(request, 'core/error.html', {
             'error': 'Invoice not found'
         })
+
+@require_http_methods(['POST'])
+def vectorize(request):
+    """Process the image and return vectorization results."""
+    try:
+        # Check for either direct file upload or temporary file path
+        if 'image' not in request.FILES and 'temp_file_path' not in request.POST:
+            return JsonResponse({'error': 'No image file provided'}, status=400)
+        
+        # Get the image either from uploaded files or temporary storage
+        if 'image' in request.FILES:
+            image = request.FILES['image']
+        else:
+            temp_path = request.POST['temp_file_path']
+            try:
+                if not default_storage.exists(temp_path):
+                    return JsonResponse({'error': 'Temporary file not found'}, status=400)
+                image = default_storage.open(temp_path)
+            except Exception as e:
+                print(f"Error accessing temporary file: {str(e)}")
+                print(f"Traceback: {traceback.format_exc()}")
+                return JsonResponse({'error': 'Error accessing uploaded file'}, status=500)
+        
+        # Validate file type
+        if not image.content_type.startswith('image/'):
+            return JsonResponse({'error': 'Invalid file type. Please upload an image.'}, status=400)
+        
+        # Validate file size (30MB limit)
+        if image.size > 30 * 1024 * 1024:
+            return JsonResponse({'error': 'File size exceeds 30MB limit.'}, status=400)
+        
+        # Check if user is authenticated
+        if not request.user.is_authenticated:
+            return JsonResponse({
+                'error': 'Authentication required',
+                'requires_login': True,
+                'login_url': reverse('core:login'),
+                'signup_url': reverse('core:signup')
+            }, status=401)
+        
+        # Check credits based on action
+        action = request.POST.get('action', 'vectorize')
+        cost = 0.2 if action == 'preview' else 1.0
+        
+        if request.user.free_previews_remaining > 0 and action == 'preview':
+            cost = 0
+        elif float(request.user.credits) < cost:
+            return JsonResponse({
+                'error': 'Insufficient credits',
+                'required_credits': cost,
+                'current_credits': float(request.user.credits)
+            }, status=402)
+        
+        try:
+            # Process the image
+            result = vectorize_image(image)
+            if 'error' in result:
+                return JsonResponse({'error': result['error']}, status=400)
+            
+            # Create transaction record
+            Transaction.objects.create(
+                user=request.user,
+                amount=cost,
+                transaction_type='preview' if action == 'preview' else 'vectorize'
+            )
+            
+            # Update user credits and free previews
+            request.user.credits -= cost
+            if action == 'preview' and request.user.free_previews_remaining > 0:
+                request.user.free_previews_remaining -= 1
+            request.user.save()
+            
+            # Create vectorization record
+            Vectorization.objects.create(
+                user=request.user,
+                original_image=image.name,
+                vector_data=result['vector_data'],
+                preview_data=result['preview_data'],
+                cost=cost
+            )
+            
+            # Clean up temporary file if it exists
+            if 'temp_file_path' in request.POST:
+                try:
+                    default_storage.delete(request.POST['temp_file_path'])
+                except Exception as e:
+                    print(f"Error deleting temporary file: {str(e)}")
+                    # Don't fail the request if cleanup fails
+            
+            return JsonResponse({
+                'success': True,
+                'vector_data': result['vector_data'],
+                'preview_data': result['preview_data'],
+                'credits_balance': float(request.user.credits),
+                'free_previews': request.user.free_previews_remaining
+            })
+            
+        except Exception as e:
+            print(f"Error processing image: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            return JsonResponse({'error': 'Error processing image'}, status=500)
+            
+    except Exception as e:
+        print(f"Unexpected error in vectorize view: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return JsonResponse({'error': 'An unexpected error occurred'}, status=500)
