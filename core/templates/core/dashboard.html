@@ -65,6 +65,7 @@
                                 <th>Credits Used</th>
                                 <th>Status</th>
                                 <th>Result</th>
+                                <th>Expires In</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -75,10 +76,17 @@
                                 <td>{{ vectorization.credits_used }}</td>
                                 <td>{{ vectorization.status }}</td>
                                 <td>
-                                    {% if vectorization.result_url %}
+                                    {% if vectorization.result_url and vectorization.status != 'EXPIRED' %}
                                         <a href="{{ vectorization.result_url }}" target="_blank" class="download-link">Download</a>
                                     {% else %}
-                                    -
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="expiration-cell" data-expires-at="{{ vectorization.expires_at|date:'c' }}">
+                                    {% if vectorization.expires_at and vectorization.status != 'EXPIRED' %}
+                                        <span class="countdown">Calculating...</span>
+                                    {% else %}
+                                        Expired
                                     {% endif %}
                                 </td>
                             </tr>
@@ -375,6 +383,19 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+.expiration-cell {
+    font-size: 0.9rem;
+}
+
+.countdown {
+    color: #666;
+}
+
+.countdown.urgent {
+    color: #ff4444;
+    font-weight: bold;
+}
+
 @media (max-width: 768px) {
     .dashboard-container {
         padding: 1rem;
@@ -491,5 +512,49 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+function updateCountdowns() {
+    const cells = document.querySelectorAll('.expiration-cell');
+    cells.forEach(cell => {
+        const expiresAt = new Date(cell.dataset.expiresAt);
+        const now = new Date();
+        const diff = expiresAt - now;
+        
+        const countdown = cell.querySelector('.countdown');
+        if (!countdown) return;
+        
+        if (diff <= 0) {
+            countdown.textContent = 'Expired';
+            cell.closest('tr').querySelector('.download-link')?.remove();
+            return;
+        }
+        
+        // Calculate hours, minutes, seconds
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        // Format the countdown
+        let timeStr = '';
+        if (hours > 0) {
+            timeStr = `${hours}h ${minutes}m`;
+        } else if (minutes > 0) {
+            timeStr = `${minutes}m ${seconds}s`;
+        } else {
+            timeStr = `${seconds}s`;
+        }
+        
+        countdown.textContent = timeStr;
+        
+        // Add urgent class if less than 1 hour remains
+        if (diff < 1000 * 60 * 60) {
+            countdown.classList.add('urgent');
+        }
+    });
+}
+
+// Update countdowns every second
+setInterval(updateCountdowns, 1000);
+updateCountdowns(); // Initial update
 </script>
 {% endblock %} 

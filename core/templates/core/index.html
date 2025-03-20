@@ -371,6 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentFile = null;
     let currentPreviewCost = 0;
     let currentTempPath = null;
+    let currentVectorData = null;
     
     // Set up drag and drop
     dropZone.addEventListener('click', () => imageInput.click());
@@ -514,14 +515,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function processImage(action) {
-        if (!currentFile) return;
-        
         processingOverlay.style.display = 'flex';
-        processingText.textContent = 'Processing image...';
+        processingText.textContent = action === 'preview' ? 'Generating preview...' : 'Vectorizing...';
         
         const formData = new FormData();
+        if (currentTempPath) {
+            formData.append('temp_file_path', currentTempPath);
+        } else {
+            formData.append('image', currentFile);
+        }
         formData.append('action', action);
-        formData.append('temp_file_path', currentTempPath);
         
         fetch('/vectorize/', {
             method: 'POST',
@@ -537,11 +540,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            resultContent.innerHTML = data.svg_content;
+            // Show the result container
             resultContainer.style.display = 'block';
+            
+            // For preview, just show the SVG without download button
+            if (action === 'preview') {
+                resultContent.innerHTML = data.preview_data;
+                downloadButton.style.display = 'none';  // Hide download button for preview
+            } else {
+                // For vectorization, show both preview and enable download
+                resultContent.innerHTML = data.preview_data;
+                downloadButton.style.display = 'block';  // Show download button for vectorization
+                
+                // Store the vector data for download
+                currentVectorData = data.vector_data;
+            }
+            
+            // Update credits display if available
+            if (data.credits_remaining !== undefined) {
+                const creditsDisplay = document.getElementById('creditsDisplay');
+                if (creditsDisplay) {
+                    creditsDisplay.textContent = `Credits: ${data.credits_remaining}`;
+                }
+            }
         })
         .catch(error => {
             console.error('Error:', error);
+            processingOverlay.style.display = 'none';
             alert('An error occurred while processing your image');
         });
     }
